@@ -1,0 +1,80 @@
+%% A config file has the syntax:
+%% [{Application1, [{Par11,Val11},...]},
+%% ...,
+%% {ApplicationN, [{ParN1,ValN1},...]}].
+
+[
+    {erlastic_search, [
+        %{port, 9200},
+        %{host, <<"127.0.0.1">>},
+        {es_user, <<"">>},
+        {es_user_pwd, <<"">>},
+        {port, 9200},
+        {host, <<"192.168.2.212">>}
+    ]},
+
+    % separator = "" 每行记录为json格式数据
+    %
+    { es_client, [
+        {scan_files, [
+            #{ % 必须是 erlang maps
+                separator=>"",
+                multiline=>false,
+                index_name=>"test-nginx-access",
+                file=>"/Users/leeyi/workspace/tools/nginx/logs/*access.log"
+            },
+            #{
+                separator=>"|",
+                keys=>[
+                    #{ % 必须是 erlang maps
+                        "name"=>"create_time",
+                        "type"=>datetime
+                    },
+                    #{
+                        "name"=>"level",
+                        "type"=>string
+                    },
+                    #{
+                        "name"=>"message",
+                        "type"=>string
+                    },
+                    #{
+                        "name"=>"other",
+                        "type"=>list
+                    }
+                ],
+                multiline=>false,
+                index_name=>"test-afd-task",
+                file=>"/Users/leeyi/workspace/tools/nginx/logs/elk_access.log"
+            },
+            #{
+                separator=>" ",
+                keys=>[
+                    #{
+                        "name"=>"date",
+                        "type"=>date
+                    },
+                    #{
+                        "name"=>"time",
+                        "type"=>time
+                    },
+                    #{
+                        "name"=>"level",
+                        "type"=>string
+                    },
+                    #{
+                        "name"=>"message",
+                        "type"=>string
+                    },
+                    #{
+                        "name"=>"other",
+                        "type"=>list
+                    }
+                ],
+                index_name=>"test-nginx-error",
+                multiline=>"^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) \[\s+\] *",
+                file=>"/Users/leeyi/workspace/tools/nginx/logs/8090mangento2-local-error.log"
+            }
+        ]}
+    ]}
+].

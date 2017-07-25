@@ -1,14 +1,15 @@
 {application, es_client,
- [{description, "An OTP application"},
+ [{description, "elasticsearch client"},
   {vsn, "0.1.0"},
+  {author, "leeyi"},
+  {email, "leeyisoft@icloud.com"},
   {registered, []},
   {mod, { es_client_app, []}},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
+
+  % 注意这个配置节是指定当前应用程序依赖哪些应用程序,类似Windows服务的依赖关系
+  {applications, [kernel,stdlib]},
   {env,[]},
-  {modules, []},
+  {modules, [file_scaner,func]},
 
   {maintainers, []},
   {licenses, ["Apache 2.0"]},
