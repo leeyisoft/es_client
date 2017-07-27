@@ -10,12 +10,15 @@
 %% Application callbacks
 -export([start/2, stop/1]).
 
+-include("es_client.hrl").
+
 %%====================================================================
 %% API
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-    io:format("es_client start ~n"),
+    io:format("es_client start _StartType ~p ~n", [_StartType]),
+    io:format("es_client start _StartArgs ~p ~n", [_StartArgs]),
     % 启动依赖APP
     application:start(sasl),
     application:start(crypto),
@@ -31,49 +34,69 @@ start(_StartType, _StartArgs) ->
     application:start(hackney),
     application:start(erlastic_search),
 
+    % mnesia检查数据库是否创建
+    % 确保先创建 schema 之后再启动 mnesia
+    case mnesia:system_info(use_dir) of
+        true ->
+            alread_created_schema;
+        _ ->
+            % mnesia:delete_schema([node()]).
+            mnesia:create_schema([node()])
+    end,
+
+    application:start(mnesia),
+
+    % 创建表 ?LogFileTable
+    % 确保已经 mnesia:start().
+    case lists:member(?LogFileTable, mnesia:system_info(tables)) of
+        false ->
+            mnesia:create_table(?LogFileTable, [{type, set},
+                           {disc_copies, [node()]}, % 磁盘 + 内存
+                           {attributes, record_info(fields, ?LogFileTable)}]);
+        _ ->
+            alread_created_table
+    end,
+
+    % 启动 es_client
     Res = es_client_sup:start_link(),
-
-
-
-    %% 处理文件
-    %% File 这里的文件一定是存在的，在调用它之前已经判断了
-    %% Multiline 要么是原子 false，要么是被设定的值
-    %% Separator 要么是空列表，要么是被设定的list
-    % handle_file = ,
-
-    % send_cast(File, Multiline, _Separator) ->
 
     % 启动 worker
     start_worker(
-        fun(File, Multiline, _Separator) ->
-            case Multiline of
-                false -> % 单行处理
-                    % handle_file_json(File);
-                    io:format("handle_file : ~p~n", [[File, Multiline, _Separator]]),
-                    FileMd5 = func:md5(File),
-                    Res2 = supervisor:start_child(es_client_sup, [FileMd5]),
-                    io:format("handle_file res2 : ~p~n", [Res2]),
-                    Res2;
-                _ ->
-                    {ok, normal}
-            end
-        end
-    ),
-
-    % 给 worker 发送异步消息 [File, Multiline, Separator]
-    start_worker(
-        fun(File, Multiline, Separator) ->
-            Msg = [File, Multiline, Separator],
-            io:format("Msg ~p~n", [Msg]),
+        fun(File, Multiline, Separator, Item) ->
+            % io:format("es_client start_worker : ~p~n", [[File, Multiline, Separator]]),
             FileMd5 = func:md5(File),
-            io:format("FileMd5 : ~p~n", [FileMd5]),
-            case whereis(list_to_atom(FileMd5)) of
-                undefined ->
-                    {error, FileMd5 ++ " not registered"};
-                Pid ->
-                    Res3 = gen_server:cast(Pid, Msg),
-                    io:format("Res3 ~p~n", [Res3])
-            end
+            % io:format("FileMd5 : ~p~n", [FileMd5]),
+            Index = case maps:find(index, Item) of
+                {ok, Index2} when is_list(Index2) ->
+                    Index2;
+                {ok, _} ->
+                    "index-name";
+                error ->
+                    "index-name"
+            end,
+            Keys = case maps:find(keys, Item) of
+                {ok, Keys2} when is_list(Keys2) ->
+                    Keys2;
+                {ok, _} ->
+                    "index-name";
+                error ->
+                    "index-name"
+            end,
+            Data = #?LogFileTable{
+                name_md5=FileMd5,
+                last_position=func:get_last_position(FileMd5),
+                multiline=Multiline, % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
+                separator=Separator, % Separator 为 "" 的标示为json格式数据
+                keys=Keys,
+                index=Index,
+                file=File
+            },
+            func:save_logfile(Data),
+
+            % start_child
+            Res2 = supervisor:start_child(es_client_sup, [Data]),
+            io:format("supervisor:start_child : ~p~n", [Res2]),
+            Res2
         end
     ),
 
@@ -131,9 +154,9 @@ analysis_files_item(Item, Callback) ->
                     BaseName = filename:basename(File),
                     FileList = filelib:fold_files(Dir, "."++BaseName, true, fun(F, AccIn) -> [F | AccIn] end, []),
 
-                    [Callback(File2, Multiline, Separator) || File2 <- FileList ];
+                    [Callback(File2, Multiline, Separator, Item) || File2 <- FileList ];
                 true ->
-                    Callback(File, Multiline, Separator)
+                    Callback(File, Multiline, Separator, Item)
             end;
         error ->
             []

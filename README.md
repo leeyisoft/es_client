@@ -17,15 +17,15 @@ Erlang/OTP 20 [erts-9.0] [source] [64-bit] [smp:4:4] [ds:4:4:10] [async-threads:
 
 ### 编译启动
 ```
-// 编译
+% 编译
 rm -rf _build && rm -rf rebar.lock && ./rebar3 compile
 
-// 启动
+% 启动
 erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
 
 ./rebar3 compile && erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
 
-./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -boot es_client
+./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client2 -mnesia dir '"mnesia.db"'
 
 application:start(es_client).
 
@@ -35,8 +35,18 @@ observer:stop(), observer:start().
 
 erlang:is_process_alive(<0.100.0>).
 
-file_scaner:stop("container1")
-file_scaner:stop("container4")
+file_scaner:stop("90a1b746a382dc494c3a960b5d3bdba5")
+
+
+
+application:start(mnesia).
+rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
+%% 查询 使用 qlc
+
+mnesia:transaction(fun() ->
+    Q = qlc:q([E || E <- mnesia:table(logfile)]),
+    qlc:e(Q)
+end).
 
 whereis(application_controller)
 
@@ -52,34 +62,106 @@ Dir = filename:dirname(F1).
 BaseName = filename:basename(F1).
 filelib:fold_files(Dir, "."++BaseName, true, fun(F, AccIn) -> [F | AccIn] end, []).
 
+```
+
+### 引入 mnesia
+```
+mnesia:system_info(use_dir)
+
+% mnesia检查数据库是否创建
+% 确保先创建 schema 之后再启动 mnesia
+% 确保已经 mnesia:start().
+lists:member(logfile, mnesia:system_info(tables)).
+
+mnesia:create_table(logfile, [{attributes, record_info(fields, logfile)}]).
+
+rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
+
+%% 查询 使用 qlc
+
+mnesia:transaction(fun() ->
+    Q = qlc:q([E || E <- mnesia:table(logfile)]),
+    qlc:e(Q)
+end).
+
+    {atomic,[]}
+{atomic,[#logfile{name_md5 = "90a1b746a382dc494c3a960b5d3bdba5",
+                  last_position = 0,
+                  file = "/Users/leeyi/workspace/tools/nginx/logs/elk_access.log",
+                  separator = "|",multiline = false,
+                  keys = [#{"name" => "create_time","type" => datetime},
+                          #{"name" => "level","type" => string},
+                          #{"name" => "message","type" => string},
+                          #{"name" => "other","type" => list}],
+                  index_name = "test-afd-task"}]}
+%% 部分查询 使用 qlc
+
+mnesia:transaction(fun() ->
+    Q = qlc:q([[E#logfile.name_md5, E#logfile.last_position] || E <- mnesia:table(logfile)]),
+    qlc:e(Q)
+end).
 
 
-Str = "2017/06/07 09:44:02 [error] 33212#0: *253 FastCGI sent in stderr: \"PHP message: An Error occurred while handling another error:\nyii\baseInvalidRouteException: Unable to resolve the request \"site/error\". in /Users/leeyi/workspace/afd/app-afd/vendor/yiisoft/yii2/base/Module.php:460\nStack trace:\n#0 /Users/leeyi/workspace/afd/app-afd/vendor/yiisoft/yii2/web/ErrorHandler.php(93): yii\baseModule->runAction('site/error')\n#1 /Users/leeyi/workspace/afd/app-afd/vendor/yiisoft/yii2/base/ErrorHandler.php(109): yiiwebErrorHandler->renderException(Object(yiiwebNotFoundHttpException))\n#2 [internal function]: yii\baseErrorHandler->handleException(Object(yiiwebNotFoundHttpException))\n#3 {main}\nPrevious exception:\nyii\baseInvalidRouteException: Unable to resolve the request \"Cdorg/index\". in /Users/leeyi/workspace/afd/app-afd/vendor/yiisoft/yii2/base/Module.php:460\nStack trace:\n#0 /Users/leeyi/workspace/afd/app-afd/vendor/yiisoft/yii2/web/Application.php(87): yii\baseModule->runAction('Cdorg/index', Array)\n#1 /Users/leeyi/workspace/afd/app-afd/vendor/yiisoft/yii2/base/Applicati\" while reading upstream, client: 127.0.0.1, server: admin.afd56.local, request: \"GET /Cdorg/index HTTP/1.1\", upstream: \"fastcgi://127.0.0.1:9000\", host: \"127.0.0.1:8082\"".
+%% 使用 mnesia:write
+    mnesia:transaction(fun() ->
+        Acc = #logfile{
+            name_md5="90a1b746a382dc494c3a960b5d3bdba5",
+            last_position=1
+        },
+        mnesia:write(Acc)
+    end).
 
-f(ReStr), ReStr = "\\d{4}\\/\\d{2}\\/\\d{2} \\d{2}:\\d{2}:\\d{2} \\[\s+\\] *".
+mnesia:transaction(fun() ->
+    Acc = #logfile{
+        name_md5 = "90a1b746a382dc494c3a960b5d3bdba5",
+        last_position=0,
+        separator="|",
+        keys=[
+            #{
+                "name"=>"create_time",
+                "type"=>datetime
+            },
+            #{
+                "name"=>"level",
+                "type"=>string
+            },
+            #{
+                "name"=>"message",
+                "type"=>string
+            },
+            #{
+                "name"=>"other",
+                "type"=>list
+            }
+        ],
+        multiline=false,
+        index="test-afd-task",
+        file="/Users/leeyi/workspace/tools/nginx/logs/elk_access.log"
+    },
+    mnesia:write(Acc)
+end).
 
-f(ReStr), ReStr = "[ , \, ]", re:split(Str, ReStr, [{return, list}]).
 ```
 
 ### 应用
 ```
-// 创建索引
+% 创建索引
 erlastic_search:create_index(<<"lee_index">>).
 
-// 删除
+% 删除
 erlastic_search:delete_index(<<"lee_index">>).
-// 批量删除
+% 批量删除
 erlastic_search:delete_index(<<"es_index_name*">>).
 erlastic_search:delete_index(<<"*index_name*">>).
 
 
-// 添加记录（自动生成 _id）
+% 添加记录（自动生成 _id）
 erlastic_search:index_doc(<<"lee_index">>, <<"type">>, [{<<"key1">>, <<"value1">>}]).
 
-// 添加记录（自定义 _id）
+% 添加记录（自定义 _id）
 erlastic_search:index_doc_with_id(<<"lee_index">>, <<"type">>, <<"id1">>, [{<<"key1">>, <<"value1">>}]).
 
-// 查询
+% 查询
 erlastic_search:search(<<"lee_index">>, <<"type">>, <<"key1:value1">>).
 
 
@@ -116,18 +198,25 @@ File = "/Users/leeyi/workspace/tools/nginx/logs/elk_access.log",
 Msg = [File, false, "|"],
 gen_server:cast({local, "fi"}, Msg).
 
-FileMd5 = '90a1b746a382dc494c3a960b5d3bdba5'.
-            case whereis(FileMd5) of
-                undefined ->
-                    {error, atom_to_list(FileMd5) ++ " not registered"};
-                Pid ->
-                    io:format("Pid ~p~n", [Pid])
-            end
+File = "/Users/leeyi/workspace/tools/nginx/logs/elk_access.log",
+{ok,Fd}=file:open(File,read),
+file:position(Fd, {bof, 158}),
+file:read_line(Fd).
+file:read_line(Fd).
+
+File = "/Users/leeyi/workspace/tools/nginx/logs/elk_access.log",
+{ok,Fd} = file:open(Fdile,read),
+Line = file:read_line(Fd),
+Position = file:position(Fd, {cur, 0}).
+
+file_scaner:stop('90a1b746a382dc494c3a960b5d3bdba5').
+observer:stop(), observer:start().
+
+application:start(es_client).
+
+rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
 ```
 
-file_scaner:stop('90a1b746a382dc494c3a960b5d3bdba5')
-observer:stop(), observer:start().
-gen_server:call('90a1b746a382dc494c3a960b5d3bdba5' , "dd").
 ### 调试
 ```
 application:start(observer).

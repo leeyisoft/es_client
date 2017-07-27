@@ -11,8 +11,10 @@ ebin
 log
 erl_crash.dump
 .rebar
-logs
+logs/*.log
 _build
 .idea
 rebar3.crashdump
 sys.config
+mnesia.db
+Mnesia.es_client@leeyideiMac

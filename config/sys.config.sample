@@ -20,7 +20,7 @@
             #{ % 必须是 erlang maps
                 separator=>"",
                 multiline=>false,
-                index_name=>"test-nginx-access",
+                index=>"test-nginx-access",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/*access.log"
             },
             #{
@@ -44,7 +44,7 @@
                     }
                 ],
                 multiline=>false,
-                index_name=>"test-afd-task",
+                index=>"test-afd-task",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/elk_access.log"
             },
             #{
@@ -71,7 +71,7 @@
                         "type"=>list
                     }
                 ],
-                index_name=>"test-nginx-error",
+                index=>"test-nginx-error",
                 multiline=>"^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) \[\s+\] *",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/8090mangento2-local-error.log"
             }
