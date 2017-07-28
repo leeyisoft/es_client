@@ -60,6 +60,9 @@ start(_StartType, _StartArgs) ->
     % 启动 es_client
     Res = es_client_sup:start_link(),
 
+    % 暂停10毫秒，等等创建、启动mnesia数据库
+    timer:sleep(10),
+
     % 启动 worker
     start_worker(
         fun(File, Multiline, Separator, Item) ->

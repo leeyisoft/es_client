@@ -23,7 +23,8 @@ rm -rf _build && rm -rf rebar.lock && ./rebar3 compile
 % 启动
 erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
 
-./rebar3 compile && erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
+
+./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client -mnesia dir '"mnesia.db"'
 
 ./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client2 -mnesia dir '"mnesia.db"'
 
