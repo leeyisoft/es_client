@@ -51,7 +51,7 @@ start(_StartType, _StartArgs) ->
     case lists:member(?LogFileTable, mnesia:system_info(tables)) of
         false ->
             mnesia:create_table(?LogFileTable, [{type, set},
-                           {disc_copies, [node()]}, % 磁盘 + 内存
+                           {?TableCopies, [node()]}, % disc_copies 磁盘 + 内存; ram_copies 内存
                            {attributes, record_info(fields, ?LogFileTable)}]);
         _ ->
             alread_created_table

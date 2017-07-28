@@ -14,13 +14,13 @@
 stop(StopArgs)->
     io:format("我是子拥程~p stop StopArgs ~p ~n", [self(), StopArgs]),
     % [FileMd5|_] = StopArgs,
-    Name2 = if
+    Name = if
         is_list(StopArgs) ->
             list_to_atom(StopArgs);
         is_atom(StopArgs) ->
             StopArgs
     end,
-    gen_server:call(Name2 , stop).
+    gen_server:call({local, Name} , stop).
 
 start_link(StartArgs) ->
     io:format("我是~p的子拥程 参数 ~p~n", [self(), StartArgs]),
@@ -40,7 +40,7 @@ init(InitArgs) ->
 
 handle_call(stop, _From, _State) ->
     io:format("我是~p的子拥程 handle_call stop _From ~p State~p~n", [self(), _From, _State]),
-    {stop, normal};
+    {stop, normal, _State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -75,7 +75,7 @@ scan_file(Item) ->
             file:position(Fd, {bof, Position}),
 
             % 循环读取文件
-            Res = loop_read_file_line(Fd),
+            Res = loop_read_file_line(Fd, Separator, Keys, Index),
             file:close(Fd),
             case Res of
                 {eof, Position2} ->
@@ -104,7 +104,7 @@ scan_file(Item) ->
 %%
 %% 循环的追行读取文件
 %%
-loop_read_file_line(Fd) ->
+loop_read_file_line(Fd, Separator, Keys, Index) ->
     Line = file:read_line(Fd),
     % 相对当前位置的偏移量；0 表示当前指针位置
     % 放在 file:read_line/1 后面，获取当前指针位置
@@ -112,12 +112,15 @@ loop_read_file_line(Fd) ->
 
     case Line of
         {ok, Line2} ->
-            Md5 = func:md5(Line2),
-            io:format("Position ~p md5 ~p : ~p~n", [Position, Md5, Line2]),
+            RowId = func:md5(Line2),
+            io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
-            loop_read_file_line(Fd);
+            Data = line_to_json(Line2, Separator, Keys),
+            sent_to_es(Index, RowId, Data),
+
+            loop_read_file_line(Fd, Separator, Keys, Index);
         "\n" ->
-            loop_read_file_line(Fd);
+            loop_read_file_line(Fd, Separator, Keys, Index);
         eof ->
             % io:format("Position ~p: ~p~n", [Position, Line]),
             {eof, Position};
@@ -126,8 +129,23 @@ loop_read_file_line(Fd) ->
     end.
 
 
-    % Sig = erlang:md5(Line),
+sent_to_es(Index, RowId, Data) ->
+    erlastic_search:index_doc_with_id(list_to_binary(Index), <<"doc">>, RowId, Data).
 
-    % RowId = iolist_to_binary([io_lib:format("~2.16.0b", [S2]) || S2 <- binary_to_list(Sig)]),
+%%
+line_to_json(Line, Separator, Keys) ->
+    if
+        Separator==[] ->
+            jsx:decode(list_to_binary(Line));
+        true ->
+            Val = string:tokens(Line, Separator),
+            Key = [maps:get("name", Item) || Item <- Keys],
 
-    % erlastic_search:index_doc_with_id(<<"lee_index">>, <<"doc">>, RowId, jsx:decode(list_to_binary(Line)))
+            {ValH, Other} = lists:split(length(Key)-1, Val),
+            ValNew = lists:reverse([Other|lists:reverse(ValH)]),
+
+            Items = lists:zip(Key, ValNew),
+
+            [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
+    end.
+

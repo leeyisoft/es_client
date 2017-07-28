@@ -1,6 +1,10 @@
 
 -define(LogFileTable, logfile).
 
+% disc_copies 磁盘 + 内存; ram_copies 内存
+% 生产环境用 disc_copies ， 开发环境用 ram_copies
+-define(TableCopies, ram_copies).
+
 % 日志文件记录，比配置文件sys.config里面scan_files 的子项多2项: name_md5 last_position
 -record(?LogFileTable, {
     name_md5, last_position,

@@ -36,8 +36,8 @@ observer:stop(), observer:start().
 
 erlang:is_process_alive(<0.100.0>).
 
-file_scaner:stop("90a1b746a382dc494c3a960b5d3bdba5")
-
+file_scaner:stop("90a1b746a382dc494c3a960b5d3bdba5").
+whereis('90a1b746a382dc494c3a960b5d3bdba5').
 
 
 application:start(mnesia).
@@ -85,61 +85,11 @@ mnesia:transaction(fun() ->
     qlc:e(Q)
 end).
 
-    {atomic,[]}
-{atomic,[#logfile{name_md5 = "90a1b746a382dc494c3a960b5d3bdba5",
-                  last_position = 0,
-                  file = "/Users/leeyi/workspace/tools/nginx/logs/elk_access.log",
-                  separator = "|",multiline = false,
-                  keys = [#{"name" => "create_time","type" => datetime},
-                          #{"name" => "level","type" => string},
-                          #{"name" => "message","type" => string},
-                          #{"name" => "other","type" => list}],
-                  index_name = "test-afd-task"}]}
 %% 部分查询 使用 qlc
 
 mnesia:transaction(fun() ->
     Q = qlc:q([[E#logfile.name_md5, E#logfile.last_position] || E <- mnesia:table(logfile)]),
     qlc:e(Q)
-end).
-
-
-%% 使用 mnesia:write
-    mnesia:transaction(fun() ->
-        Acc = #logfile{
-            name_md5="90a1b746a382dc494c3a960b5d3bdba5",
-            last_position=1
-        },
-        mnesia:write(Acc)
-    end).
-
-mnesia:transaction(fun() ->
-    Acc = #logfile{
-        name_md5 = "90a1b746a382dc494c3a960b5d3bdba5",
-        last_position=0,
-        separator="|",
-        keys=[
-            #{
-                "name"=>"create_time",
-                "type"=>datetime
-            },
-            #{
-                "name"=>"level",
-                "type"=>string
-            },
-            #{
-                "name"=>"message",
-                "type"=>string
-            },
-            #{
-                "name"=>"other",
-                "type"=>list
-            }
-        ],
-        multiline=false,
-        index="test-afd-task",
-        file="/Users/leeyi/workspace/tools/nginx/logs/elk_access.log"
-    },
-    mnesia:write(Acc)
 end).
 
 ```
@@ -216,6 +166,44 @@ observer:stop(), observer:start().
 application:start(es_client).
 
 rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
+
+
+Val = ["[2017-06-01 10:28:00] "," SD.INFO ",
+ " coroutine sql UPDATE a_sms_log SET response = '870467003841637376', response_time = '1496370480' WHERE id = '3347' ",
+ " [] ","[]"],
+
+Keys = [
+    #{
+        "name"=>"create_time",
+        "type"=>datetime
+    },
+    #{
+        "name"=>"level",
+        "type"=>string
+    },
+    #{
+        "name"=>"message",
+        "type"=>string
+    },
+    #{
+        "name"=>"other",
+        "type"=>list
+    }
+],
+
+
+Key = [maps:get("name", Item) || Item <- Keys],
+KeyLen = length(Key),
+ValLen = length(Val),
+{ValH, Other} = lists:split(length(Key)-1, Val),
+ValNew = lists:reverse([Other|lists:reverse(ValH)]),
+Items = lists:zip(Key, ValNew),
+[{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
+
+
+
+Line = "{ \"@timestamp\": \"07/Jun/2017:11:27:35 +0800\", \"http_host\": \"127.0.0.1:8085\", \"http_x_forwarded_for\": \"-\", \"request\": \"GET / HTTP/1.1\", \"status\": 200, \"remote_addr\": \"127.0.0.1\", \"remote_user\": \"-\", \"request_body\": \"-\", \"content_length\": \"-\", \"request_time\": 0.001, \"request_method\": \"GET\", \"http_referrer\": \"-\", \"body_bytes_sent\": 478, \"http_user_agent\": \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\" }".
+jsx:decode(list_to_binary(Str)).
 ```
 
 ### 调试
