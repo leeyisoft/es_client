@@ -204,6 +204,13 @@ Items = lists:zip(Key, ValNew),
 
 Line = "{ \"@timestamp\": \"07/Jun/2017:11:27:35 +0800\", \"http_host\": \"127.0.0.1:8085\", \"http_x_forwarded_for\": \"-\", \"request\": \"GET / HTTP/1.1\", \"status\": 200, \"remote_addr\": \"127.0.0.1\", \"remote_user\": \"-\", \"request_body\": \"-\", \"content_length\": \"-\", \"request_time\": 0.001, \"request_method\": \"GET\", \"http_referrer\": \"-\", \"body_bytes_sent\": 478, \"http_user_agent\": \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\" }".
 jsx:decode(list_to_binary(Str)).
+
+Line = "2016/10/20 09:46:21 [error] 91034#0: *707 FastCGI sent in stderr: \"PHP message: PHP Fatal error:  Class 'Phalconmultiple3\Frontend\Controllers\ControllerBase' not found in\n2016/11/22 09:46:21 [error] 91034#0: *707 Fas".
+
+{ok,MP}=re:compile("^\d{4}\/\d{2}\/\d{2}", [multiline]).
+
+f(MP), {ok,MP}=re:compile("\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}", [multiline]), re:run(Line, MP).
+
 ```
 
 ### 调试

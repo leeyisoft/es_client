@@ -74,8 +74,12 @@ scan_file(Item) ->
             % 把文件指针移到上次读取后的位置
             file:position(Fd, {bof, Position}),
 
-            % 循环读取文件
-            Res = loop_read_file_line(Fd, Separator, Keys, Index),
+            Res = if
+                Multiline==false -> % 循环读取文件行
+                    loop_read_file_line(Fd, Separator, Keys, Index);
+                true ->
+                    loop_read_file_multiline(Fd, Position, 4000)
+            end,
             file:close(Fd),
             case Res of
                 {eof, Position2} ->
@@ -111,15 +115,15 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
     {ok, Position} = file:position(Fd, {cur, 0}),
 
     case Line of
+        {ok, "\n"} ->
+            loop_read_file_line(Fd, Separator, Keys, Index);
         {ok, Line2} ->
             RowId = func:md5(Line2),
             io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
-            Data = line_to_json(Line2, Separator, Keys),
-            sent_to_es(Index, RowId, Data),
+            % Data = str_to_json(Line2, Separator, Keys),
+            % sent_to_es(Index, RowId, Data),
 
-            loop_read_file_line(Fd, Separator, Keys, Index);
-        "\n" ->
             loop_read_file_line(Fd, Separator, Keys, Index);
         eof ->
             % io:format("Position ~p: ~p~n", [Position, Line]),
@@ -128,17 +132,17 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
             {error, Reason, Position}
     end.
 
-
-sent_to_es(Index, RowId, Data) ->
-    erlastic_search:index_doc_with_id(list_to_binary(Index), <<"doc">>, RowId, Data).
+loop_read_file_multiline(Fd, StartPoistion, ReadLength) ->
+    {ok, Binary} = file:pread(Fd, StartPoistion, ReadLength),
+    ok.
 
 %%
-line_to_json(Line, Separator, Keys) ->
+str_to_json(Str, Separator, Keys) ->
     if
         Separator==[] ->
-            jsx:decode(list_to_binary(Line));
+            jsx:decode(list_to_binary(Str));
         true ->
-            Val = string:tokens(Line, Separator),
+            Val = string:tokens(Str, Separator),
             Key = [maps:get("name", Item) || Item <- Keys],
 
             {ValH, Other} = lists:split(length(Key)-1, Val),
