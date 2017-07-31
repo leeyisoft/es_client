@@ -78,7 +78,8 @@ scan_file(Item) ->
                 Multiline==false -> % 循环读取文件行
                     loop_read_file_line(Fd, Separator, Keys, Index);
                 true ->
-                    loop_read_file_multiline(Fd, Position, 4000)
+                    FSize = filelib:file_size(File),
+                    loop_read_file_multiline(Multiline, Fd, Position, FSize, 400)
             end,
             file:close(Fd),
             case Res of
@@ -96,7 +97,9 @@ scan_file(Item) ->
                     % 休眠5s
                     timer:sleep(5000),
                     % eof 的情况下，再次循环文件
-                    scan_file(Data)
+                    scan_file(Data);
+                _ ->
+                    io:format("scan_file end Res ~p ~n", [Res])
             end,
             {ok, Res};
         {error, Why} ->
@@ -132,24 +135,75 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
             {error, Reason, Position}
     end.
 
-loop_read_file_multiline(Fd, StartPoistion, ReadLength) ->
-    {ok, Binary} = file:pread(Fd, StartPoistion, ReadLength),
-    ok.
+loop_read_file_multiline(Re, Fd, StartPoistion, FSize, ReadLength) ->
+    case file:pread(Fd, StartPoistion, ReadLength) of
+        {ok, Binary} ->
+            {ok,MP} = re:compile(Re),
+
+            case re:run(Binary, MP, [{capture,all,index},global]) of
+                {match, [_Head|[_Head|Tail]]} when length(Tail)>20 ->
+                    loop_read_file_multiline(Re, Fd, StartPoistion, FSize, ReadLength - ReadLength div 2);
+                {match, List} when length(List)>1 -> % 至少两个记录
+                    % io:format("~nBinary ~p: ~p~n", [StartPoistion, Binary]),
+                    % io:format("~n StartPoistion : ~p, Len: ~p, List ~p,~n", [StartPoistion, length(List), List]),
+
+                    List2 = [Len || [{Len, _}] <- List],
+                    List3 = lists:reverse(List2),
+                    [_|List4] = List3,
+                    [_|ListB] = List2,
+                    ListA = lists:reverse(List4),
+                    List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
+                    % List3 = [{StartPoistion+Len, Len} || Len <- List2],
+
+                    Rows = [read_line_for_lrfm(Fd, StartPoistion + Start, Len) || {Start,Len} <- lists:zip(ListA, List5)],
+                    %
+                    [str_to_json(Str, ",", ok) || Str <- Rows],
+                    % [_H|Tail] = lists:reverse(List),
+                    NewStartPoistion = lists:max(List2) + StartPoistion,
+                    loop_read_file_multiline(Re, Fd, NewStartPoistion, FSize, ReadLength);
+                {match, _} when FSize > (StartPoistion + ReadLength) -> % 只匹配一行记录
+                    % io:format("~n not end StartPoistion ~p, 1 ReadLength ~p ~n", [StartPoistion, ReadLength]),
+                    NewLen = ReadLength * 3,
+                    loop_read_file_multiline(Re, Fd, StartPoistion, FSize, NewLen);
+                {match, _} -> % 最后一行了
+                    str_to_json(Binary, ",", ok),
+                    Len = length(Binary),
+                    % io:format("~n end StartPoistion ~p, 1 ReadLength ~p 1 Len ~p Binary ~p ~n", [StartPoistion, ReadLength, Len, Binary]),
+
+                    {eof, StartPoistion + Len};
+                nomatch ->
+                    loop_read_file_multiline(Re, Fd, StartPoistion, FSize, ReadLength + ReadLength div 2)
+            end;
+        eof ->
+            % io:format("StartPoistion ~p: ~p~n", [StartPoistion, Line]),
+            {eof, StartPoistion};
+        {error, Reason} ->
+            {error, Reason, StartPoistion}
+    end.
+% read_line_for_lrfm/3 的 List至少有一个记录
+read_line_for_lrfm(Fd, StartPoistion, Len)->
+    {ok, Row} = file:pread(Fd, StartPoistion, Len),
+    Row.
 
 %%
 str_to_json(Str, Separator, Keys) ->
-    if
-        Separator==[] ->
-            jsx:decode(list_to_binary(Str));
-        true ->
-            Val = string:tokens(Str, Separator),
-            Key = [maps:get("name", Item) || Item <- Keys],
+    io:format("~nstr_to_json Separator ~p: ~p~n~n~n", [Separator, Str]),
+    Keys.
+    % if
+    %     Separator==[] ->
+    %         jsx:decode(list_to_binary(Str));
+    %     true ->
+    %         Val = string:tokens(Str, Separator),
+    %         Key = [maps:get("name", Item) || Item <- Keys],
 
-            {ValH, Other} = lists:split(length(Key)-1, Val),
-            ValNew = lists:reverse([Other|lists:reverse(ValH)]),
+    %         {ValH, Other} = lists:split(length(Key)-1, Val),
+    %         ValNew = lists:reverse([Other|lists:reverse(ValH)]),
 
-            Items = lists:zip(Key, ValNew),
+    %         Items = lists:zip(Key, ValNew),
 
-            [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
-    end.
+    %         [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
+    % end.
+
+
+
 

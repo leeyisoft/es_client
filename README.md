@@ -155,9 +155,7 @@ file:position(Fd, {bof, 158}),
 file:read_line(Fd).
 file:read_line(Fd).
 
-File = "/Users/leeyi/workspace/tools/nginx/logs/elk_access.log",
-{ok,Fd} = file:open(Fdile,read),
-Line = file:read_line(Fd),
+
 Position = file:position(Fd, {cur, 0}).
 
 file_scaner:stop('90a1b746a382dc494c3a960b5d3bdba5').
@@ -201,16 +199,40 @@ Items = lists:zip(Key, ValNew),
 [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
 
 
+Line = "2017/06/08 13:48:11 [error] 70233#0: *512 FastCGI sent in stderr: \"PHP message: PHP Fatal error:  Class 'common\\models\\base\\BaseModel' not found in /Users/leeyi/workspace/afd/afd-admin/models/card/Org.php on line 18\" while reading response header from upstream,\nclient: 127.0.0.1, server: admin.afd56.local, request: \"GET /cdorg/index HTTP/1.1\", upstream: \"fastcgi://127.0.0.1:9000\", host: \"127.0.0.1:8085\"\n2017/06/09 13:49:11 [info] 70233#0: *524 client timed out (60: Operation timed out) while waiting for request, client: 127.0.0.1, server: 0.0.0.0:8085\n2017/06/10 13:48:11 [error] 70233#0: *512 FastCGI sent in stderr: \"PHP message: PHP Fatal error:  Class 'common\\models\\base\\BaseModel' not found in /Users/leeyi/workspace/afd/afd-admin/models/card/Org.php on line 18\" while reading response header from upstream, client: 127.0.0.1, server: admin.afd56.local, request: \"GET /cdorg/index HTTP/1.1\", upstream: \"fastcgi://127.0.0.1:9000\", host: \"127.0.0.1:8085\"".
 
-Line = "{ \"@timestamp\": \"07/Jun/2017:11:27:35 +0800\", \"http_host\": \"127.0.0.1:8085\", \"http_x_forwarded_for\": \"-\", \"request\": \"GET / HTTP/1.1\", \"status\": 200, \"remote_addr\": \"127.0.0.1\", \"remote_user\": \"-\", \"request_body\": \"-\", \"content_length\": \"-\", \"request_time\": 0.001, \"request_method\": \"GET\", \"http_referrer\": \"-\", \"body_bytes_sent\": 478, \"http_user_agent\": \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\" }".
-jsx:decode(list_to_binary(Str)).
+f(MP), {ok,MP}=re:compile("\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}"),
+re:run(Line, MP, [{capture,all,index},global]).
 
-Line = "2016/10/20 09:46:21 [error] 91034#0: *707 FastCGI sent in stderr: \"PHP message: PHP Fatal error:  Class 'Phalconmultiple3\Frontend\Controllers\ControllerBase' not found in\n2016/11/22 09:46:21 [error] 91034#0: *707 Fas".
 
-{ok,MP}=re:compile("^\d{4}\/\d{2}\/\d{2}", [multiline]).
+f(),
+File = "/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log",
+{ok,Fd} = file:open(File,read),
+file:pread(Fd, 133, 800).
 
-f(MP), {ok,MP}=re:compile("\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}", [multiline]), re:run(Line, MP).
+f(),
+File = "/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log",
+filelib:file_size(File).
 
+application:start(es_client).
+
+observer:start().
+
+observer:stop(), observer:start().
+
+file_scaner:test().
+
+StartPoistion = 133,
+f(),
+List = [[{0,19}],[{407,19}],[{558,19}]].
+List2 = [Len || [{Len, _}] <- List],
+List3 = lists:reverse(List2),
+[_|List4] = List3,
+[_|ListB] = List2,
+ListA = lists:reverse(List4),
+List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
+
+lists:zip(ListA, List5).
 ```
 
 ### 调试
