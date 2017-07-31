@@ -11,3 +11,5 @@
     file, separator, multiline, keys, index
 }).
 
+% true 想在自己的代码上使用EUnit（例如使用?assert宏），但是你并不想产生测试。
+% -define(NOTEST, true)

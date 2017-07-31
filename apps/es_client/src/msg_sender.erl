@@ -2,14 +2,16 @@
 
 -behaviour(gen_server).
 
+-include("es_client.hrl").
+% eunit 引入 放在 include es_client 之后
+-include_lib("eunit/include/eunit.hrl").
+
 -export([start_link/1]).
 -export([stop/1]).
 
 %% gen_server 回调函数
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
-
--include("es_client.hrl").
 
 stop(StopArgs)->
     io:format("我是子拥程~p stop StopArgs ~p ~n", [self(), StopArgs]),
