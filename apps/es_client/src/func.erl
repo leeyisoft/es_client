@@ -4,7 +4,10 @@
 
 -include_lib("stdlib/include/qlc.hrl").
 
--export ([md5/1, get_last_position/1, save_logfile/1, get_logfile/1]).
+-export ([md5/1]).
+
+-export ([get_last_position/1, save_logfile/1]).
+-export ([save_msg/2, get_msg/0]).
 
 %%
 %% erlang md5 16进制字符串
@@ -25,28 +28,22 @@ get_last_position(NameMd5) ->
             Position
     end.
 
-get_logfile(NameMd5) ->
-    Res = mnesia:transaction(fun() ->
-        Q = qlc:q([E || E <- mnesia:table(?LogFileTable), E#?LogFileTable.name_md5==NameMd5]),
-        qlc:e(Q)
-    end),
-    case Res of
-        {atomic,[]} ->
-            [];
-        {atomic, [Row]} ->
-            Row
-    end.
 
 save_logfile(Data) when is_record(Data, ?LogFileTable) ->
     mnesia:transaction(fun() ->
-        % Acc = #logfile{
-        %     name_md5=Md5,
-        %     last_position=0,
-        %     multiline=Multiline, % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
-        %     separator=Separator, % Separator 为 "" 的标示为json格式数据
-        %     keys=Keys,
-        %     index=Index,
-        %     file=File
-        % },
+        mnesia:write(Data)
+    end).
+
+
+get_msg() ->
+    ok.
+
+save_msg(Md5, Msg_erlastic_json) ->
+    mnesia:transaction(fun() ->
+        Data = #?MsgSenderTable{
+            msg_md5=Md5,
+            msg=Msg_erlastic_json,
+            timestamp=calendar:datetime_to_gregorian_seconds(erlang:universaltime())
+        },
         mnesia:write(Data)
     end).

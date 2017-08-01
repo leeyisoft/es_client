@@ -1,11 +1,15 @@
 
--define(LogFileTable, logfile).
-
+-define (LogFileTable, esc_logfile).
+-define (MsgSenderTable, esc_msg_sendeer).
 
 % 日志文件记录，比配置文件sys.config里面scan_files 的子项多2项: name_md5 last_position
 -record(?LogFileTable, {
     name_md5, last_position,
     file, separator, multiline, keys, index
+}).
+
+-record(?MsgSenderTable, {
+    msg_md5, msg, timestamp
 }).
 
 

@@ -163,6 +163,8 @@ observer:stop(), observer:start().
 
 application:start(es_client).
 
+func:get_last_position("90a1b746a382dc494c3a960b5d3bdba5").
+
 f(),
 File = "/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log",
 {ok,Fd} = file:open(File,read),

@@ -131,7 +131,12 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
 
             Data = str_to_json(Line2, Separator, Keys),
             % sent_to_es(Index, RowId, Data),
-
+            MsgData = #?MsgSenderTable{
+                msg_md5=RowId,
+                msg=Data,
+                timestamp=calendar:datetime_to_gregorian_seconds(erlang:universaltime())
+            },
+            func:save_msg(RowId, MsgData),
             loop_read_file_line(Fd, Separator, Keys, Index);
         eof ->
             % io:format("Position ~p: ~p~n", [Position, Line]),
@@ -163,7 +168,8 @@ loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, R
                     Rows = [read_line_for_lrfm(Fd, StartPoistion + Start, Len) || {Start,Len} <- lists:zip(ListA, List5)],
                     %
                     DataList = [{func:md5(Str), str_to_json(Str, Separator, Keys)} || Str <- Rows],
-                    % [msg_sender:sent_to_es(Index, RowId, Data) || {RowId, Data} <- DataList],
+                    % [msg_sender:sent_to_es(Index, RowId, MsgData) || {RowId, MsgData} <- DataList],
+                    [func:save_msg(RowId, MsgData) || {RowId, MsgData} <- DataList],
                     % [_H|Tail] = lists:reverse(List),
                     NewStartPoistion = lists:max(List2) + StartPoistion,
                     loop_read_file_multiline(Separator, Re, Keys, Index, Fd, NewStartPoistion, FSize, ReadLength);
@@ -172,10 +178,14 @@ loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, R
                     NewLen = ReadLength * 3,
                     loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, NewLen);
                 {match, _} -> % 最后一行了
-                    Data = str_to_json(Binary, Separator, Keys),
-                    % msg_sender:sent_to_es(Index, func:md5(Binary), Data),
+                    MsgData = str_to_json(Binary, Separator, Keys),
+                    % save to mnesia
+                    RowId = func:md5(Binary),
+                    func:save_msg(RowId, MsgData),
+                    % msg_sender:sent_to_es(Index, RowId, MsgData),
+
                     Len = length(Binary),
-                    io:format("~n end StartPoistion ~p, 1 ReadLength ~p 1 Len ~p Binary ~p ~n", [StartPoistion, ReadLength, Len, Binary]),
+                    % io:format("~n end StartPoistion ~p, 1 ReadLength ~p 1 Len ~p Binary ~p ~n", [StartPoistion, ReadLength, Len, Binary]),
 
                     {eof, StartPoistion + Len};
                 nomatch ->
@@ -195,14 +205,19 @@ read_line_for_lrfm(Fd, StartPoistion, Len)->
 %%
 str_to_json(Str, Separator, Keys) ->
     try
+        CheckSeparator = string:find(Separator, "["),
         if
             Separator==[] ->
                 jsx:decode(list_to_binary(Str));
+            CheckSeparator==nomatch ->
+                Vals = string:split(Str, Separator, all),
+                SubList = lists:sublist(Vals, length(Keys)),
+                Items = [format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, SubList)],
+                [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- lists:flatten(Items)];
             true ->
-                % re:split(Str, "[,|\\[|\\]]+", [{return, list}])
                 Vals = re:split(Str, Separator, [{return, list}]),
-
-                Items = [format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, Vals)],
+                SubList = lists:sublist(Vals, length(Keys)),
+                Items = [format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, SubList)],
                 [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- lists:flatten(Items)]
         end
     catch

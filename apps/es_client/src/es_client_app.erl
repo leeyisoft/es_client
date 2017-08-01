@@ -50,9 +50,22 @@ start(_StartType, _StartArgs) ->
     % 确保已经 mnesia:start().
     case lists:member(?LogFileTable, mnesia:system_info(tables)) of
         false ->
+            % 创建表
             mnesia:create_table(?LogFileTable, [{type, set},
                            {?TableCopies, [node()]}, % disc_copies 磁盘 + 内存; ram_copies 内存
                            {attributes, record_info(fields, ?LogFileTable)}]);
+        _ ->
+            alread_created_table
+    end,
+
+    % 创建表 ?MsgSenderTable
+    % 确保已经 mnesia:start().
+    case lists:member(?MsgSenderTable, mnesia:system_info(tables)) of
+        false ->
+            % 创建表
+            mnesia:create_table(?MsgSenderTable, [{type, ordered_set},
+                           {?TableCopies, [node()]}, % disc_copies 磁盘 + 内存; ram_copies 内存
+                           {attributes, record_info(fields, ?MsgSenderTable)}]);
         _ ->
             alread_created_table
     end,

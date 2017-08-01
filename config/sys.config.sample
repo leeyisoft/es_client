@@ -29,7 +29,7 @@
                     {name, "createtime", datetime},
                     {name, "level", string},
                     {name, "message", string},
-                    {name, "other", list}
+                    {name, "other", string}
                 ],
                 multiline=>false,
                 index=>"test-afd-task",
