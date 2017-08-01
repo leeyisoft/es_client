@@ -1,8 +1,7 @@
 -module (func).
 
 -include("es_client.hrl").
-% eunit 引入 放在 include es_client 之后
--include_lib("eunit/include/eunit.hrl").
+
 -include_lib("stdlib/include/qlc.hrl").
 
 -export ([md5/1, get_last_position/1, save_logfile/1, get_logfile/1]).

@@ -163,48 +163,6 @@ observer:stop(), observer:start().
 
 application:start(es_client).
 
-rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
-
-
-Val = ["[2017-06-01 10:28:00] "," SD.INFO ",
- " coroutine sql UPDATE a_sms_log SET response = '870467003841637376', response_time = '1496370480' WHERE id = '3347' ",
- " [] ","[]"],
-
-Keys = [
-    #{
-        "name"=>"create_time",
-        "type"=>datetime
-    },
-    #{
-        "name"=>"level",
-        "type"=>string
-    },
-    #{
-        "name"=>"message",
-        "type"=>string
-    },
-    #{
-        "name"=>"other",
-        "type"=>list
-    }
-],
-
-
-Key = [maps:get("name", Item) || Item <- Keys],
-KeyLen = length(Key),
-ValLen = length(Val),
-{ValH, Other} = lists:split(length(Key)-1, Val),
-ValNew = lists:reverse([Other|lists:reverse(ValH)]),
-Items = lists:zip(Key, ValNew),
-[{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
-
-
-Line = "2017/06/08 13:48:11 [error] 70233#0: *512 FastCGI sent in stderr: \"PHP message: PHP Fatal error:  Class 'common\\models\\base\\BaseModel' not found in /Users/leeyi/workspace/afd/afd-admin/models/card/Org.php on line 18\" while reading response header from upstream,\nclient: 127.0.0.1, server: admin.afd56.local, request: \"GET /cdorg/index HTTP/1.1\", upstream: \"fastcgi://127.0.0.1:9000\", host: \"127.0.0.1:8085\"\n2017/06/09 13:49:11 [info] 70233#0: *524 client timed out (60: Operation timed out) while waiting for request, client: 127.0.0.1, server: 0.0.0.0:8085\n2017/06/10 13:48:11 [error] 70233#0: *512 FastCGI sent in stderr: \"PHP message: PHP Fatal error:  Class 'common\\models\\base\\BaseModel' not found in /Users/leeyi/workspace/afd/afd-admin/models/card/Org.php on line 18\" while reading response header from upstream, client: 127.0.0.1, server: admin.afd56.local, request: \"GET /cdorg/index HTTP/1.1\", upstream: \"fastcgi://127.0.0.1:9000\", host: \"127.0.0.1:8085\"".
-
-f(MP), {ok,MP}=re:compile("\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}"),
-re:run(Line, MP, [{capture,all,index},global]).
-
-
 f(),
 File = "/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log",
 {ok,Fd} = file:open(File,read),
@@ -220,8 +178,6 @@ observer:start().
 
 observer:stop(), observer:start().
 
-file_scaner:test().
-
 StartPoistion = 133,
 f(),
 List = [[{0,19}],[{407,19}],[{558,19}]].
@@ -233,6 +189,49 @@ ListA = lists:reverse(List4),
 List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
 
 lists:zip(ListA, List5).
+
+application:start(es_client).
+
+
+
+f().
+Val = "request: \"GET /img/a4.jpg HTTP/1.1\"",
+Separator = ":",
+KeyList = ["http_method","http_path", "http_protocol"],
+
+[KeyName|Val2] = string:split(Val, Separator),
+Separator2 = " ",
+ValList = string:split(string:trim(Val2, both, Separator2), Separator2, all),
+List = lists:sublist(ValList, length(KeyList)),
+List2 = lists:zip(KeyList, List)
+
+
+f().
+Key = {name, "createtime", datetime}.
+Val = "[ 192.168.2.178] ".
+
+Re = "\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}",
+{ok,MP} = re:compile(Re),
+{match,[[Ip]]} = re:run(Val, MP, [{capture,all, list},global]),
+
+
+f().
+Separator = ":",
+Val = " upstream: \"fastcgi://127.0.0.1:9000\"".
+[KeyName|ValLi] = string:split(Val, Separator),
+Val2 = lists:concat([lists:concat([Str, Separator]) || Str <- ValLi]),
+string:trim(Val2, both, "\" :").
+
+f().
+Separator2 = " / ",
+KeyList = ["http_method", "http_protocol"],
+Key = {split, ":", {split, Separator2, KeyList}},
+Val = " request: \"GET / HTTP/1.1 / abc \"",
+[KeyName|Val2] = string:split(Val, ":"),
+ValList = string:split(Val2, " / ", all),
+List2 = lists:zip(KeyList, lists:sublist(ValList, length(KeyList))),
+[{a, b} | List2].
+
 ```
 
 ### 调试

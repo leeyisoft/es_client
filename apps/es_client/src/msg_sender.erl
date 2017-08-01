@@ -3,10 +3,9 @@
 -behaviour(gen_server).
 
 -include("es_client.hrl").
-% eunit 引入 放在 include es_client 之后
--include_lib("eunit/include/eunit.hrl").
 
--export([start_link/1]).
+-export([start_link/1, sent_to_es/3]).
+
 -export([stop/1]).
 
 %% gen_server 回调函数
@@ -63,7 +62,7 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%% private
 
 sent_to_es(Index, RowId, Data) ->
     erlastic_search:index_doc_with_id(list_to_binary(Index), <<"doc">>, RowId, Data).
+%% private

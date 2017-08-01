@@ -13,6 +13,9 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+% for test
+-compile(export_all).
+
 stop(StopArgs)->
     io:format("我是子拥程~p stop StopArgs ~p ~n", [self(), StopArgs]),
     % [FileMd5|_] = StopArgs,
@@ -81,7 +84,7 @@ scan_file(Item) ->
                     loop_read_file_line(Fd, Separator, Keys, Index);
                 true ->
                     FSize = filelib:file_size(File),
-                    loop_read_file_multiline(Multiline, Fd, Position, FSize, 400)
+                    loop_read_file_multiline(Separator, Multiline, Keys, Index, Fd, Position, FSize, 400)
             end,
             file:close(Fd),
             case Res of
@@ -126,7 +129,7 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
             RowId = func:md5(Line2),
             io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
-            % Data = str_to_json(Line2, Separator, Keys),
+            Data = str_to_json(Line2, Separator, Keys),
             % sent_to_es(Index, RowId, Data),
 
             loop_read_file_line(Fd, Separator, Keys, Index);
@@ -137,14 +140,14 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
             {error, Reason, Position}
     end.
 
-loop_read_file_multiline(Re, Fd, StartPoistion, FSize, ReadLength) ->
+loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength) ->
     case file:pread(Fd, StartPoistion, ReadLength) of
         {ok, Binary} ->
             {ok,MP} = re:compile(Re),
 
             case re:run(Binary, MP, [{capture,all,index},global]) of
                 {match, [_Head|[_Head|Tail]]} when length(Tail)>20 ->
-                    loop_read_file_multiline(Re, Fd, StartPoistion, FSize, ReadLength - ReadLength div 2);
+                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength - ReadLength div 2);
                 {match, List} when length(List)>1 -> % 至少两个记录
                     % io:format("~nBinary ~p: ~p~n", [StartPoistion, Binary]),
                     % io:format("~n StartPoistion : ~p, Len: ~p, List ~p,~n", [StartPoistion, length(List), List]),
@@ -159,22 +162,24 @@ loop_read_file_multiline(Re, Fd, StartPoistion, FSize, ReadLength) ->
 
                     Rows = [read_line_for_lrfm(Fd, StartPoistion + Start, Len) || {Start,Len} <- lists:zip(ListA, List5)],
                     %
-                    [str_to_json(Str, ",", ok) || Str <- Rows],
+                    DataList = [{func:md5(Str), str_to_json(Str, Separator, Keys)} || Str <- Rows],
+                    % [msg_sender:sent_to_es(Index, RowId, Data) || {RowId, Data} <- DataList],
                     % [_H|Tail] = lists:reverse(List),
                     NewStartPoistion = lists:max(List2) + StartPoistion,
-                    loop_read_file_multiline(Re, Fd, NewStartPoistion, FSize, ReadLength);
+                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, NewStartPoistion, FSize, ReadLength);
                 {match, _} when FSize > (StartPoistion + ReadLength) -> % 只匹配一行记录
                     % io:format("~n not end StartPoistion ~p, 1 ReadLength ~p ~n", [StartPoistion, ReadLength]),
                     NewLen = ReadLength * 3,
-                    loop_read_file_multiline(Re, Fd, StartPoistion, FSize, NewLen);
+                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, NewLen);
                 {match, _} -> % 最后一行了
-                    str_to_json(Binary, ",", ok),
+                    Data = str_to_json(Binary, Separator, Keys),
+                    % msg_sender:sent_to_es(Index, func:md5(Binary), Data),
                     Len = length(Binary),
-                    % io:format("~n end StartPoistion ~p, 1 ReadLength ~p 1 Len ~p Binary ~p ~n", [StartPoistion, ReadLength, Len, Binary]),
+                    io:format("~n end StartPoistion ~p, 1 ReadLength ~p 1 Len ~p Binary ~p ~n", [StartPoistion, ReadLength, Len, Binary]),
 
                     {eof, StartPoistion + Len};
                 nomatch ->
-                    loop_read_file_multiline(Re, Fd, StartPoistion, FSize, ReadLength + ReadLength div 2)
+                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength + ReadLength div 2)
             end;
         eof ->
             % io:format("StartPoistion ~p: ~p~n", [StartPoistion, Line]),
@@ -189,23 +194,92 @@ read_line_for_lrfm(Fd, StartPoistion, Len)->
 
 %%
 str_to_json(Str, Separator, Keys) ->
-    io:format("~nstr_to_json Separator ~p: ~p~n~n~n", [Separator, Str]),
-    Keys.
-    % if
-    %     Separator==[] ->
-    %         jsx:decode(list_to_binary(Str));
-    %     true ->
-    %         Val = string:tokens(Str, Separator),
-    %         Key = [maps:get("name", Item) || Item <- Keys],
+    try
+        if
+            Separator==[] ->
+                jsx:decode(list_to_binary(Str));
+            true ->
+                % re:split(Str, "[,|\\[|\\]]+", [{return, list}])
+                Vals = re:split(Str, Separator, [{return, list}]),
 
-    %         {ValH, Other} = lists:split(length(Key)-1, Val),
-    %         ValNew = lists:reverse([Other|lists:reverse(ValH)]),
+                Items = [format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, Vals)],
+                [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- lists:flatten(Items)]
+        end
+    catch
+        Exception:Reason ->
+            io:format("~n catch str_to_json Separator: ~p, Keys: ~p, string: ~p~n~n~n", [Separator, Keys, Str]),
+            io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
+            {caught, Exception, Reason}
+    end.
 
-    %         Items = lists:zip(Key, ValNew),
+%% 格式化数据，按照 keys 配置的元组转换数据类型
+%% 返回的可能是 {K, V} 元组，也可能是 list [{K1,V1}, ...]
+format_k_v(Key, Val) when is_tuple(Key) ->
+    Item = case Key of
+        {name, Name, ip} ->
+            Re = "\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}",
+            {ok,MP} = re:compile(Re),
+            {match,[[Ip]]} = re:run(Val, MP, [{capture,all, list},global]),
+            {Name, Ip};
+        {name, Name, datetime} ->
+            Re = "\\d{4}[-|/]?\\d{2}[-|/]?\\d{2} \\d{2}:\\d{2}:\\d{2}",
+            {ok,MP} = re:compile(Re),
+            {match,[[DateTime]]} = re:run(Val, MP, [{capture,all, list},global]),
+            {Name, DateTime};
+        {name, Name, integer} ->
+            {Name, list_to_integer(Val)};
+        {name, Name, float} ->
+            {Name, list_to_float(Val)};
+        {name, Name, string} ->
+            {Name, Val};
 
-    %         [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
-    % end.
+        {split, Separator, {split, Separator2, KeyList}} when is_list(KeyList) ->
 
+            [KeyName|Val2] = string:split(Val, Separator),
 
+            ValList = string:split(string:trim(Val2, both, Separator2), Separator2, all),
+            List = lists:sublist(ValList, length(KeyList)),
+            List2 = lists:zip(KeyList, List),
+
+            [{KeyName, Val2} | List2];
+
+        {split, Separator, ip} ->
+            [KeyName|_ValLi] = string:split(Val, Separator),
+
+            Re = "\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}",
+            {ok,MP} = re:compile(Re),
+            {match,[[Ip]]} = re:run(Val, MP, [{capture,all, list},global]),
+
+            {KeyName, Ip};
+        {split, Separator, datetime} ->
+            [KeyName|_ValLi] = string:split(Val, Separator),
+
+            Re = "\\d{4}[-|/]?\\d{2}[-|/]?\\d{2} \\d{2}:\\d{2}:\\d{2}",
+            {ok,MP} = re:compile(Re),
+            {match,[[DateTime]]} = re:run(Val, MP, [{capture,all, list},global]),
+
+            {KeyName, DateTime};
+        {split, Separator, string} ->
+            [KeyName|Val2] = string:split(Val, Separator),
+            {KeyName, Val2}
+    end,
+    format_k_v(Item).
+
+%% 过滤无效字符串 \" :
+format_k_v(Item) ->
+    FilterStr = "\" :",
+    case Item of
+        {Key1, Val1} when is_list(Key1), is_list(Val1) ->
+            {string:trim(Key1), string:trim(Val1, both, FilterStr)};
+        {Key1, Val1} when is_list(Key1) ->
+
+            {string:trim(Key1), Val1};
+        {Key1, Val1} when is_list(Val1) ->
+            {Key1, string:trim(Val1, both, FilterStr)};
+        [_H|_Tail] ->
+            [format_k_v(Item2) || Item2 <- Item];
+        _ ->
+            Item
+    end.
 
 

@@ -26,54 +26,30 @@
             #{
                 separator=>"|",
                 keys=>[
-                    #{ % 必须是 erlang maps
-                        "name"=>"create_time",
-                        "type"=>datetime
-                    },
-                    #{
-                        "name"=>"level",
-                        "type"=>string
-                    },
-                    #{
-                        "name"=>"message",
-                        "type"=>string
-                    },
-                    #{
-                        "name"=>"other",
-                        "type"=>list
-                    }
+                    {name, "createtime", datetime},
+                    {name, "level", string},
+                    {name, "message", string},
+                    {name, "other", list}
                 ],
                 multiline=>false,
                 index=>"test-afd-task",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/elk_access.log"
             },
-            #{
-                separator=>" ",
+            #{ % for nginx error
+                separator=>"[,|\\[|\\]]+",
                 keys=>[
-                    #{
-                        "name"=>"date",
-                        "type"=>date
-                    },
-                    #{
-                        "name"=>"time",
-                        "type"=>time
-                    },
-                    #{
-                        "name"=>"level",
-                        "type"=>string
-                    },
-                    #{
-                        "name"=>"message",
-                        "type"=>string
-                    },
-                    #{
-                        "name"=>"other",
-                        "type"=>list
-                    }
+                    {name, "createtime", datetime},
+                    {name, "level", string},
+                    {name, "message", string},
+                    {split, ":", ip},
+                    {split, ":", string},
+                    {split, ":", {split, " ", ["http_method", "http_path", "http_protocol"]}},
+                    {split, ":", string},
+                    {split, ":", string}
                 ],
+                multiline=>"\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}",
                 index=>"test-nginx-error",
-                multiline=>"^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) \[\s+\] *",
-                file=>"/Users/leeyi/workspace/tools/nginx/logs/8090mangento2-local-error.log"
+                file=>"/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log"
             }
         ]}
     ]}

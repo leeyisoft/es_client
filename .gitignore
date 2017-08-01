@@ -19,3 +19,4 @@ sys.config
 mnesia.db
 Mnesia.es_client@leeyideiMac
 apps/es_client/doc
+TEST*.xml
