@@ -33,7 +33,7 @@
                 ],
                 multiline=>false,
                 index=>"test-afd-task",
-                file=>"/Users/leeyi/workspace/tools/nginx/logs/elk_access.log"
+                file=>"/Users/leeyi/workspace/tools/nginx/logs/task_log.log"
             },
             #{ % for nginx error
                 separator=>"[,|\\[|\\]]+",
@@ -41,6 +41,7 @@
                     {name, "createtime", datetime},
                     {name, "level", string},
                     {name, "message", string},
+
                     {split, ":", ip},
                     {split, ":", string},
                     {split, ":", {split, " ", ["http_method", "http_path", "http_protocol"]}},

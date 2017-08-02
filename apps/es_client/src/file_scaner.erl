@@ -2,12 +2,7 @@
 
 -behaviour(gen_server).
 
--include("es_client.hrl").
-% eunit 引入 放在 include es_client 之后
--include_lib("eunit/include/eunit.hrl").
-
 -export([start_link/1, scan_file/1]).
--export([stop/1]).
 
 %% gen_server 回调函数
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -16,26 +11,15 @@
 % for test
 -compile(export_all).
 
-stop(StopArgs)->
-    io:format("我是子拥程~p stop StopArgs ~p ~n", [self(), StopArgs]),
-    % [FileMd5|_] = StopArgs,
-    Name = if
-        is_list(StopArgs) ->
-            list_to_atom(StopArgs);
-        is_atom(StopArgs) ->
-            StopArgs
-    end,
-    gen_server:call({local, Name} , stop).
-
 start_link(StartArgs) ->
     io:format("我是~p的子拥程 参数 ~p~n", [self(), StartArgs]),
-    {?LogFileTable, FileMd5, _Position, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs,
+    {FileMd5, _Position, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs,
     gen_server:start_link({local, list_to_atom(FileMd5)}, ?MODULE, StartArgs, []).
 
 init(InitArgs) ->
     % 注意，如果想让 terminate/2 在应用程序停止时被调用，
     % 就必须设置 trap_exit = true
-    process_flag(trap_exit, true),
+    % process_flag(trap_exit, true),
 
     Pid = self(),
     io:format("我是子拥程~p init InitArgs ~p ~n", [Pid, InitArgs]),
@@ -70,11 +54,11 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 scan_file(Item) ->
-    {?LogFileTable, FileMd5, _Position, File, Separator, Multiline, Keys, Index} = Item,
+    {FileMd5, _Position, File, Separator, Multiline, Keys, Index} = Item,
     case file:open(File, read) of
         {ok, Fd} ->
             % 从数据库读取
-            Position = func:get_last_position(FileMd5),
+            Position = esc_db:get_last_position(FileMd5),
             % io:format("我是子拥程~p scan_file Position ~p ~n", [self(), Position]),
             % 把文件指针移到上次读取后的位置
             file:position(Fd, {bof, Position}),
@@ -89,20 +73,12 @@ scan_file(Item) ->
             file:close(Fd),
             case Res of
                 {eof, Position2} ->
-                    Data = #?LogFileTable{
-                        name_md5=FileMd5,
-                        last_position=Position2,
-                        multiline=Multiline, % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
-                        separator=Separator, % Separator 为 "" 的标示为json格式数据
-                        keys=Keys,
-                        index=Index,
-                        file=File
-                    },
-                    func:save_logfile(Data),
+                    esc_db:save_logfile(FileMd5, Position2),
                     % 休眠5s
                     timer:sleep(5000),
                     % eof 的情况下，再次循环文件
-                    scan_file(Data);
+                    Item2 = {FileMd5, Position2, File, Separator, Multiline, Keys, Index},
+                    scan_file(Item2);
                 _ ->
                     io:format("scan_file end Res ~p ~n", [Res])
             end,
@@ -129,14 +105,9 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
             RowId = func:md5(Line2),
             io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
-            Data = str_to_json(Line2, Separator, Keys),
-            % sent_to_es(Index, RowId, Data),
-            MsgData = #?MsgSenderTable{
-                msg_md5=RowId,
-                msg=Data,
-                timestamp=calendar:datetime_to_gregorian_seconds(erlang:universaltime())
-            },
-            func:save_msg(RowId, MsgData),
+            MsgData = str_to_json(Line2, Separator, Keys),
+            sent_to_msg_sender(Index, RowId, MsgData),
+
             loop_read_file_line(Fd, Separator, Keys, Index);
         eof ->
             % io:format("Position ~p: ~p~n", [Position, Line]),
@@ -157,20 +128,35 @@ loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, R
                     % io:format("~nBinary ~p: ~p~n", [StartPoistion, Binary]),
                     % io:format("~n StartPoistion : ~p, Len: ~p, List ~p,~n", [StartPoistion, length(List), List]),
 
-                    List2 = [Len || [{Len, _}] <- List],
+                    % List2 = [0, 1, 3, 5, 7]
+                    % ListA = [0, 1, 3, 5] % 每个记录的相对其实位置
+                    % ListB = [1, 3, 5, 7]
+                    % List5 = ListB - ListA % 每个记录的偏移量
+                    % lists:zip(ListA, List5)
+
+                    % List2 匹配结果的每个记录的其实位置
+                    List2 = [Offset || [{Offset, _}] <- List],
+
+                    % 去除最后一行记录，因为它很有可能不是一个完整的记录
                     List3 = lists:reverse(List2),
                     [_|List4] = List3,
-                    [_|ListB] = List2,
-                    ListA = lists:reverse(List4),
-                    List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
-                    % List3 = [{StartPoistion+Len, Len} || Len <- List2],
 
-                    Rows = [read_line_for_lrfm(Fd, StartPoistion + Start, Len) || {Start,Len} <- lists:zip(ListA, List5)],
-                    %
+                    % 每个记录的相对其实位置
+                    ListA = lists:reverse(List4),
+
+                    [_|ListB] = List2,
+
+                    % 获取记录偏移量
+                    List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
+
+                    % 计算每个记录的开始位置和长度, 根据每个记录的开始位置和长度读取记录
+                    Rows = [read_line_for_lrfm(Fd, StartPoistion + Start, Offset) || {Start,Offset} <- lists:zip(ListA, List5)],
+                    % 把记录转换成 erlastic_json() 类型的数据
                     DataList = [{func:md5(Str), str_to_json(Str, Separator, Keys)} || Str <- Rows],
-                    % [msg_sender:sent_to_es(Index, RowId, MsgData) || {RowId, MsgData} <- DataList],
-                    [func:save_msg(RowId, MsgData) || {RowId, MsgData} <- DataList],
-                    % [_H|Tail] = lists:reverse(List),
+                    % 发送数据到 msg_sender，以便于推送到 es
+                    [sent_to_msg_sender(Index, RowId, MsgData) || {RowId, MsgData} <- DataList],
+
+                    % 从新的位置继续读取
                     NewStartPoistion = lists:max(List2) + StartPoistion,
                     loop_read_file_multiline(Separator, Re, Keys, Index, Fd, NewStartPoistion, FSize, ReadLength);
                 {match, _} when FSize > (StartPoistion + ReadLength) -> % 只匹配一行记录
@@ -181,7 +167,7 @@ loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, R
                     MsgData = str_to_json(Binary, Separator, Keys),
                     % save to mnesia
                     RowId = func:md5(Binary),
-                    func:save_msg(RowId, MsgData),
+                    sent_to_msg_sender(Index, RowId, MsgData),
                     % msg_sender:sent_to_es(Index, RowId, MsgData),
 
                     Len = length(Binary),
@@ -297,4 +283,7 @@ format_k_v(Item) ->
             Item
     end.
 
-
+sent_to_msg_sender(Index, MsgMd5, Msg) ->
+    io:format("sent_to_msg_sender/ index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg]),
+    msg_sender:sent_to_es(Index, MsgMd5, Msg),
+    ok.

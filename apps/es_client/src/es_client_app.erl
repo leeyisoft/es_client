@@ -10,7 +10,8 @@
 %% Application callbacks
 -export([start/2, stop/1]).
 
--include("es_client.hrl").
+% for test
+-compile(export_all).
 
 %%====================================================================
 %% API
@@ -34,83 +35,25 @@ start(_StartType, _StartArgs) ->
     application:start(hackney),
     application:start(erlastic_search),
 
-    % mnesia检查数据库是否创建
-    % 确保先创建 schema 之后再启动 mnesia
-    case mnesia:system_info(use_dir) of
-        true ->
-            alread_created_schema;
-        _ ->
-            % mnesia:delete_schema([node()]).
-            mnesia:create_schema([node()])
-    end,
-
-    application:start(mnesia),
-
-    % 创建表 ?LogFileTable
-    % 确保已经 mnesia:start().
-    case lists:member(?LogFileTable, mnesia:system_info(tables)) of
-        false ->
-            % 创建表
-            mnesia:create_table(?LogFileTable, [{type, set},
-                           {?TableCopies, [node()]}, % disc_copies 磁盘 + 内存; ram_copies 内存
-                           {attributes, record_info(fields, ?LogFileTable)}]);
-        _ ->
-            alread_created_table
-    end,
-
-    % 创建表 ?MsgSenderTable
-    % 确保已经 mnesia:start().
-    case lists:member(?MsgSenderTable, mnesia:system_info(tables)) of
-        false ->
-            % 创建表
-            mnesia:create_table(?MsgSenderTable, [{type, ordered_set},
-                           {?TableCopies, [node()]}, % disc_copies 磁盘 + 内存; ram_copies 内存
-                           {attributes, record_info(fields, ?MsgSenderTable)}]);
-        _ ->
-            alread_created_table
-    end,
+    esc_db:start(),
 
     % 启动 es_client
     Res = es_client_sup:start_link(),
 
-    % 暂停10毫秒，等等创建、启动mnesia数据库
-    timer:sleep(10),
-
     % 启动 worker
     start_worker(
-        fun(File, Multiline, Separator, Item) ->
+        % Separator 为 "" 的标示为json格式数据
+        % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
+        fun(File, Separator, Multiline, Keys, Index) ->
             % io:format("es_client start_worker : ~p~n", [[File, Multiline, Separator]]),
             FileMd5 = func:md5(File),
             % io:format("FileMd5 : ~p~n", [FileMd5]),
-            Index = case maps:find(index, Item) of
-                {ok, Index2} when is_list(Index2) ->
-                    Index2;
-                {ok, _} ->
-                    "index-name";
-                error ->
-                    "index-name"
-            end,
-            Keys = case maps:find(keys, Item) of
-                {ok, Keys2} when is_list(Keys2) ->
-                    Keys2;
-                {ok, _} ->
-                    "index-name";
-                error ->
-                    "index-name"
-            end,
-            Data = #?LogFileTable{
-                name_md5=FileMd5,
-                last_position=func:get_last_position(FileMd5),
-                multiline=Multiline, % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
-                separator=Separator, % Separator 为 "" 的标示为json格式数据
-                keys=Keys,
-                index=Index,
-                file=File
-            },
-            func:save_logfile(Data),
+            Position = esc_db:get_last_position(FileMd5),
+            esc_db:save_logfile(FileMd5, Position),
 
             % start_child
-            Res2 = supervisor:start_child(es_client_sup, [Data]),
+            StartArgs = {FileMd5, Position, File, Separator, Multiline, Keys, Index},
+            Res2 = supervisor:start_child(es_client_sup, [StartArgs]),
             io:format("supervisor:start_child : ~p~n", [Res2]),
             Res2
         end
@@ -159,6 +102,23 @@ analysis_files_item(Item, Callback) ->
         error ->
             false
     end,
+    Keys = case maps:find(keys, Item) of
+        {ok, Keys2} when is_list(Keys2) ->
+            Keys2;
+        {ok, _} ->
+            "unset_keys";
+        error ->
+            "unset_keys"
+    end,
+    Index = case maps:find(index, Item) of
+        {ok, Index2} when is_list(Index2) ->
+            Index2;
+        {ok, _} ->
+            "index-name";
+        error ->
+            "index-name"
+    end,
+
     % 获取文件
     case maps:find(file, Item) of
         {ok, File} ->
@@ -170,9 +130,9 @@ analysis_files_item(Item, Callback) ->
                     BaseName = filename:basename(File),
                     FileList = filelib:fold_files(Dir, "."++BaseName, true, fun(F, AccIn) -> [F | AccIn] end, []),
 
-                    [Callback(File2, Multiline, Separator, Item) || File2 <- FileList ];
+                    [Callback(File2, Separator, Multiline, Keys, Index) || File2 <- FileList ];
                 true ->
-                    Callback(File, Multiline, Separator, Item)
+                    Callback(File, Separator, Multiline, Keys, Index)
             end;
         error ->
             []

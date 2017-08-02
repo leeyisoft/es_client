@@ -2,8 +2,6 @@
 
 -behaviour(gen_server).
 
--include("es_client.hrl").
-
 -export([start_link/1, sent_to_es/3]).
 
 -export([stop/1]).
@@ -25,8 +23,9 @@ stop(StopArgs)->
 
 start_link(StartArgs) ->
     io:format("我是~p的子拥程 参数 ~p~n", [self(), StartArgs]),
-    {?LogFileTable, FileMd5, _Position, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs,
-    gen_server:start_link({local, list_to_atom(FileMd5)}, ?MODULE, StartArgs, []).
+    % {FileMd5, _Position, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs,
+    % gen_server:start_link({local, list_to_atom(FileMd5)}, ?MODULE, StartArgs, []).
+    ok.
 
 init(InitArgs) ->
     % 注意，如果想让 terminate/2 在应用程序停止时被调用，

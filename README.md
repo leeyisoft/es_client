@@ -26,17 +26,17 @@ erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
 
 ./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client -mnesia dir '"mnesia.db"'
 
-./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client2 -mnesia dir '"mnesia.db"'
+./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client3 -mnesia dir '"mnesia.db3"'
 
-application:start(es_client).
+需要添加 scan_files 配置项检查的功能，便于检查用户是否真的配置好了
 
 observer:start().
+application:start(es_client).
 
 observer:stop(), observer:start().
 
 erlang:is_process_alive(<0.100.0>).
 
-file_scaner:stop("90a1b746a382dc494c3a960b5d3bdba5").
 whereis('90a1b746a382dc494c3a960b5d3bdba5').
 
 
@@ -45,7 +45,7 @@ rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
 %% 查询 使用 qlc
 
 mnesia:transaction(fun() ->
-    Q = qlc:q([E || E <- mnesia:table(logfile)]),
+    Q = qlc:q([E || E <- mnesia:table(esc_logfile)]),
     qlc:e(Q)
 end).
 
@@ -72,23 +72,23 @@ mnesia:system_info(use_dir)
 % mnesia检查数据库是否创建
 % 确保先创建 schema 之后再启动 mnesia
 % 确保已经 mnesia:start().
-lists:member(logfile, mnesia:system_info(tables)).
+lists:member(esc_logfile, mnesia:system_info(tables)).
 
-mnesia:create_table(logfile, [{attributes, record_info(fields, logfile)}]).
+mnesia:create_table(esc_logfile, [{attributes, record_info(fields, esc_logfile)}]).
 
 rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
 
 %% 查询 使用 qlc
 
 mnesia:transaction(fun() ->
-    Q = qlc:q([E || E <- mnesia:table(logfile)]),
+    Q = qlc:q([E || E <- mnesia:table(esc_logfile)]),
     qlc:e(Q)
 end).
 
 %% 部分查询 使用 qlc
 
 mnesia:transaction(fun() ->
-    Q = qlc:q([[E#logfile.name_md5, E#logfile.last_position] || E <- mnesia:table(logfile)]),
+    Q = qlc:q([[E#esc_logfile.name_md5, E#esc_logfile.last_position] || E <- mnesia:table(esc_logfile)]),
     qlc:e(Q)
 end).
 
@@ -163,7 +163,7 @@ observer:stop(), observer:start().
 
 application:start(es_client).
 
-func:get_last_position("90a1b746a382dc494c3a960b5d3bdba5").
+esc_db:get_last_position("90a1b746a382dc494c3a960b5d3bdba5").
 
 f(),
 File = "/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log",

@@ -1,6 +1,5 @@
 -module (file_scaner_tests).
 
--include("es_client.hrl").
 % eunit 引入 放在 include es_client 之后
 -include_lib("eunit/include/eunit.hrl").
 
@@ -22,7 +21,7 @@ format_k_v_3_test() ->
 
 
 taks_test() ->
-    Str = "[2017-06-02 10:38:59] | SD.INFO | coroutine sql INSERT INTO a_sms_log (`mobile`, `type`, `template_name`, `content`, `response`, `callback_response`, `create_time`, `response_time`, `callback_response_time`) VALUES ('13714593405', 'app\\\\Helpers\\\\Libs\\\\sms\\\\cly\\\\Clysms', 'shipper_receive_captcha', '{\\\"name\\\":\\\"\\\\u5218\\\\u7ea2\\\\u77f3\\\",\\\"order_no\\\":\\\"1705319750974857545\\\",\\\"code\\\":\\\"648150\\\",\\\"driver\\\":\\\"\\\\u9ad8\\\\u660c\\\\u4f1f\\\"}', '', '', '1496371139', '0', '0') | [] |[]",
+    Str = "[2017-06-01 10:28:00] | SD.INFO | coroutine sql UPDATE a_sms_log SET response = '870467003841637376', response_time = '1496370480' WHERE id = '3347' | [] |[]\n",
     Keys = [
         {name, "createtime", datetime},
         {name, "level", string},
@@ -31,8 +30,9 @@ taks_test() ->
     ],
     Separator = "|",
     Vals = string:split(Str, Separator, all),
+    Vals2 = lists:sublist(Vals, length(Keys)),
     % io:format("~p~n", [Vals]).
-    Items = [file_scaner:format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, Vals)],
+    Items = [file_scaner:format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, Vals2)],
     io:format("~n~p~n", [ lists:flatten(Items)]).
     % [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
 

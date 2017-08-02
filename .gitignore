@@ -16,7 +16,7 @@ _build
 .idea
 rebar3.crashdump
 sys.config
-mnesia.db
+mnesia.db*
 Mnesia.es_client@leeyideiMac
 apps/es_client/doc
 TEST*.xml
