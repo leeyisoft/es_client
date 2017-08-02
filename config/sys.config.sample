@@ -28,29 +28,35 @@
                 keys=>[
                     {name, "createtime", datetime},
                     {name, "level", string},
-                    {name, "message", string},
-                    {name, "other", string}
+                    {name, "message", string}
                 ],
                 multiline=>false,
                 index=>"test-afd-task",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/task_log.log"
             },
             #{ % for nginx error
-                separator=>"[,|\\[|\\]]+",
+                separator=>", c",
                 keys=>[
-                    {name, "createtime", datetime},
-                    {name, "level", string},
-                    {name, "message", string},
-
-                    {split, ":", ip},
-                    {split, ":", string},
-                    {split, ":", {split, " ", ["http_method", "http_path", "http_protocol"]}},
-                    {split, ":", string},
-                    {split, ":", string}
+                    {split,"[\\[|\\]]+", [
+                        {name, "createtime", datetime},
+                        {name, "level", string},
+                        {name, "message", string}
+                    ]},
+                    {split, ",", [
+                        {split, ":", ip},
+                        {split, ":", string},
+                        {split, ":", {split, " ", [
+                            {name,"request_method", string},
+                            {name,"request_path", string},
+                            {name,"http_protocol", string}
+                        ]}},
+                        {split, ":", string},
+                        {split, ":", string}
+                    ]}
                 ],
                 multiline=>"\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}",
                 index=>"test-nginx-error",
-                file=>"/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log"
+                file=>"/Users/leeyi/workspace/tools/nginx/logs/*error.log"
             }
         ]}
     ]}

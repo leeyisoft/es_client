@@ -28,7 +28,8 @@ erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
 
 ./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client3 -mnesia dir '"mnesia.db3"'
 
-需要添加 scan_files 配置项检查的功能，便于检查用户是否真的配置好了
+需要添加 scan_files 配置项检查的功能，便于检查用户是否真的配置好了;
+需要添加 reload 配置的功能；
 
 observer:start().
 application:start(es_client).
@@ -195,54 +196,20 @@ lists:zip(ListA, List5).
 application:start(es_client).
 
 
-
-f().
-Val = "request: \"GET /img/a4.jpg HTTP/1.1\"",
-Separator = ":",
-KeyList = ["http_method","http_path", "http_protocol"],
-
-[KeyName|Val2] = string:split(Val, Separator),
-Separator2 = " ",
-ValList = string:split(string:trim(Val2, both, Separator2), Separator2, all),
-List = lists:sublist(ValList, length(KeyList)),
-List2 = lists:zip(KeyList, List)
-
-
-f().
-Key = {name, "createtime", datetime}.
-Val = "[ 192.168.2.178] ".
-
-Re = "\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}",
-{ok,MP} = re:compile(Re),
-{match,[[Ip]]} = re:run(Val, MP, [{capture,all, list},global]),
-
-
-f().
-Separator = ":",
-Val = " upstream: \"fastcgi://127.0.0.1:9000\"".
-[KeyName|ValLi] = string:split(Val, Separator),
-Val2 = lists:concat([lists:concat([Str, Separator]) || Str <- ValLi]),
-string:trim(Val2, both, "\" :").
-
-f().
-Separator2 = " / ",
-KeyList = ["http_method", "http_protocol"],
-Key = {split, ":", {split, Separator2, KeyList}},
-Val = " request: \"GET / HTTP/1.1 / abc \"",
-[KeyName|Val2] = string:split(Val, ":"),
-ValList = string:split(Val2, " / ", all),
-List2 = lists:zip(KeyList, lists:sublist(ValList, length(KeyList))),
-[{a, b} | List2].
-
 ```
 
 ### 调试
 ```
-application:start(observer).
 observer:start().
+application:start(es_client).
+
+application:start(observer).
+
 ```
 
 ### 测试
 ```
 ./rebar3 eunit
 ```
+
+

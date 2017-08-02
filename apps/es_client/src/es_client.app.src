@@ -9,7 +9,7 @@
   % 注意这个配置节是指定当前应用程序依赖哪些应用程序,类似Windows服务的依赖关系
   {applications, [kernel,stdlib]},
   {env,[]},
-  {modules, [file_scaner, msg_sender, esc_db,func]},
+  {modules, [file_scaner, esc_db,func]},
 
   {maintainers, []},
   {licenses, ["Apache 2.0"]},

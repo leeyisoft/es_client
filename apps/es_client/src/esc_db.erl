@@ -2,9 +2,12 @@
 
 -include_lib("stdlib/include/qlc.hrl").
 
--export ([start/0]).
+-export ([start/0
+    , get_last_position/1
+    , save_logfile/2
+]).
 
--export ([get_last_position/1, save_logfile/2]).
+-export ([]).
 
 % disc_copies 磁盘 + 内存; ram_copies 内存
 % 生产环境用 disc_copies ， 开发环境用 ram_copies

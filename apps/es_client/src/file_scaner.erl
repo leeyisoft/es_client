@@ -2,11 +2,16 @@
 
 -behaviour(gen_server).
 
--export([start_link/1, scan_file/1]).
+-export([start_link/1]).
 
 %% gen_server 回调函数
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+-export([init/1
+    , handle_call/3
+    , handle_cast/2
+    , handle_info/2
+    , terminate/2
+    , code_change/3
+]).
 
 % for test
 -compile(export_all).
@@ -53,22 +58,29 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+%% private
+
 scan_file(Item) ->
     {FileMd5, _Position, File, Separator, Multiline, Keys, Index} = Item,
     case file:open(File, read) of
         {ok, Fd} ->
             % 从数据库读取
             Position = esc_db:get_last_position(FileMd5),
+            % 获取文件大小
+            FSize = filelib:file_size(File),
+            % if
+            %     Position>FSize ->
+            %         body
+            % end,
             % io:format("我是子拥程~p scan_file Position ~p ~n", [self(), Position]),
             % 把文件指针移到上次读取后的位置
             file:position(Fd, {bof, Position}),
 
             Res = if
                 Multiline==false -> % 循环读取文件行
-                    loop_read_file_line(Fd, Separator, Keys, Index);
+                    loop_read_file_line(Fd, Separator, Keys, Index, File);
                 true ->
-                    FSize = filelib:file_size(File),
-                    loop_read_file_multiline(Separator, Multiline, Keys, Index, Fd, Position, FSize, 400)
+                    loop_read_file_multiline(File, Separator, Multiline, Keys, Index, Fd, Position, FSize, 400)
             end,
             file:close(Fd),
             case Res of
@@ -87,12 +99,10 @@ scan_file(Item) ->
             {error, Why}
     end.
 
-%% private
-
 %%
 %% 循环的追行读取文件
 %%
-loop_read_file_line(Fd, Separator, Keys, Index) ->
+loop_read_file_line(Fd, Separator, Keys, Index, File) ->
     Line = file:read_line(Fd),
     % 相对当前位置的偏移量；0 表示当前指针位置
     % 放在 file:read_line/1 后面，获取当前指针位置
@@ -100,15 +110,16 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
 
     case Line of
         {ok, "\n"} ->
-            loop_read_file_line(Fd, Separator, Keys, Index);
+            loop_read_file_line(Fd, Separator, Keys, Index, File);
         {ok, Line2} ->
             RowId = func:md5(Line2),
-            io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
+            io:format("Position ~p RowId ~p ~n", [Position, RowId]),
+            % io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
-            MsgData = str_to_json(Line2, Separator, Keys),
-            sent_to_msg_sender(Index, RowId, MsgData),
+            MsgData = str_to_json(Line2, Separator, Keys, File),
+            sent_to_msg(Index, RowId, MsgData),
 
-            loop_read_file_line(Fd, Separator, Keys, Index);
+            loop_read_file_line(Fd, Separator, Keys, Index, File);
         eof ->
             % io:format("Position ~p: ~p~n", [Position, Line]),
             {eof, Position};
@@ -116,14 +127,14 @@ loop_read_file_line(Fd, Separator, Keys, Index) ->
             {error, Reason, Position}
     end.
 
-loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength) ->
+loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength) ->
     case file:pread(Fd, StartPoistion, ReadLength) of
         {ok, Binary} ->
             {ok,MP} = re:compile(Re),
 
             case re:run(Binary, MP, [{capture,all,index},global]) of
                 {match, [_Head|[_Head|Tail]]} when length(Tail)>20 ->
-                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength - ReadLength div 2);
+                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength - ReadLength div 2);
                 {match, List} when length(List)>1 -> % 至少两个记录
                     % io:format("~nBinary ~p: ~p~n", [StartPoistion, Binary]),
                     % io:format("~n StartPoistion : ~p, Len: ~p, List ~p,~n", [StartPoistion, length(List), List]),
@@ -150,24 +161,24 @@ loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, R
                     List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
 
                     % 计算每个记录的开始位置和长度, 根据每个记录的开始位置和长度读取记录
-                    Rows = [read_line_for_lrfm(Fd, StartPoistion + Start, Offset) || {Start,Offset} <- lists:zip(ListA, List5)],
+                    Rows = [func:esc_read_line(Fd, StartPoistion + Start, Offset) || {Start,Offset} <- lists:zip(ListA, List5)],
                     % 把记录转换成 erlastic_json() 类型的数据
-                    DataList = [{func:md5(Str), str_to_json(Str, Separator, Keys)} || Str <- Rows],
-                    % 发送数据到 msg_sender，以便于推送到 es
-                    [sent_to_msg_sender(Index, RowId, MsgData) || {RowId, MsgData} <- DataList],
+                    DataList = [{func:md5(Str), str_to_json(Str, Separator, Keys, File)} || Str <- Rows],
+                    % 发送数据到 es
+                    [sent_to_msg(Index, RowId, MsgData) || {RowId, MsgData} <- DataList],
 
                     % 从新的位置继续读取
                     NewStartPoistion = lists:max(List2) + StartPoistion,
-                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, NewStartPoistion, FSize, ReadLength);
+                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, NewStartPoistion, FSize, ReadLength);
                 {match, _} when FSize > (StartPoistion + ReadLength) -> % 只匹配一行记录
                     % io:format("~n not end StartPoistion ~p, 1 ReadLength ~p ~n", [StartPoistion, ReadLength]),
                     NewLen = ReadLength * 3,
-                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, NewLen);
+                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, NewLen);
                 {match, _} -> % 最后一行了
-                    MsgData = str_to_json(Binary, Separator, Keys),
+                    MsgData = str_to_json(Binary, Separator, Keys, File),
                     % save to mnesia
                     RowId = func:md5(Binary),
-                    sent_to_msg_sender(Index, RowId, MsgData),
+                    sent_to_msg(Index, RowId, MsgData),
                     % msg_sender:sent_to_es(Index, RowId, MsgData),
 
                     Len = length(Binary),
@@ -175,7 +186,7 @@ loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, R
 
                     {eof, StartPoistion + Len};
                 nomatch ->
-                    loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength + ReadLength div 2)
+                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength + ReadLength div 2)
             end;
         eof ->
             % io:format("StartPoistion ~p: ~p~n", [StartPoistion, Line]),
@@ -183,28 +194,17 @@ loop_read_file_multiline(Separator, Re, Keys, Index, Fd, StartPoistion, FSize, R
         {error, Reason} ->
             {error, Reason, StartPoistion}
     end.
-% read_line_for_lrfm/3 的 List至少有一个记录
-read_line_for_lrfm(Fd, StartPoistion, Len)->
-    {ok, Row} = file:pread(Fd, StartPoistion, Len),
-    Row.
 
 %%
-str_to_json(Str, Separator, Keys) ->
+str_to_json(Str, Separator, Keys, File) ->
     try
-        CheckSeparator = string:find(Separator, "["),
+
         if
             Separator==[] ->
                 jsx:decode(list_to_binary(Str));
-            CheckSeparator==nomatch ->
-                Vals = string:split(Str, Separator, all),
-                SubList = lists:sublist(Vals, length(Keys)),
-                Items = [format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, SubList)],
-                [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- lists:flatten(Items)];
             true ->
-                Vals = re:split(Str, Separator, [{return, list}]),
-                SubList = lists:sublist(Vals, length(Keys)),
-                Items = [format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, SubList)],
-                [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- lists:flatten(Items)]
+                Vals = func:esc_split(Str, Separator, all),
+                kv_to_erlastic_json(Keys, Vals, File)
         end
     catch
         Exception:Reason ->
@@ -213,8 +213,18 @@ str_to_json(Str, Separator, Keys) ->
             {caught, Exception, Reason}
     end.
 
+kv_to_erlastic_json(Keys, Vals, File) when is_list(Keys), is_list(Vals), length(Keys)>0, length(Vals)>0 ->
+    KVList = func:esc_zip(Keys, Vals),
+    % io:format("kv_to_erlastic_json Vals: ~p~n", [Vals]),
+    % io:format("kv_to_erlastic_json KVList: ~p~n", [KVList]),
+    Items = [format_k_v(Key, Val) || {Key, Val} <- KVList],
+    Items2 = [{"file", File} | Items],
+    % io:format("kv_to_erlastic_json Items: ~p~n", [Items]),
+    [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- lists:flatten(Items2)].
+
+
 %% 格式化数据，按照 keys 配置的元组转换数据类型
-%% 返回的可能是 {K, V} 元组，也可能是 list [{K1,V1}, ...]
+%% 返回的可能是 {K, V} 元组、空列表 []，也可能是 list [{K1,V1}, ...]
 format_k_v(Key, Val) when is_tuple(Key) ->
     Item = case Key of
         {name, Name, ip} ->
@@ -234,24 +244,60 @@ format_k_v(Key, Val) when is_tuple(Key) ->
         {name, Name, string} ->
             {Name, Val};
 
+        {split, Separator, KLi} when is_list(KLi), Val==[] ->
+            [];
+        {split, Separator, KLi} when is_list(KLi) ->
+            VLi = func:esc_split(Val, Separator, all),
+            List = func:esc_zip(KLi, VLi),
+            [format_k_v(Key2, Val2) || {Key2, Val2} <- List];
+        {split, Separator, _} ->
+            [_Key|Name] = func:esc_split(Val, Separator),
+            if
+                Name==[] ->
+                    [];
+                true ->
+                    format_k_v_split(Key, Val)
+            end
+    end,
+    format_k_v(Item).
+
+format_k_v_split(Key, Val) ->
+    case Key of
         {split, Separator, {split, Separator2, KeyList}} when is_list(KeyList) ->
 
             [KeyName|Val2] = string:split(Val, Separator),
 
             ValList = string:split(string:trim(Val2, both, Separator2), Separator2, all),
             List = lists:sublist(ValList, length(KeyList)),
-            List2 = lists:zip(KeyList, List),
 
-            [{KeyName, Val2} | List2];
+            List4 = if
+                List==[] ->
+                    [];
+                true ->
+                    List2 = func:esc_zip(KeyList, List),
+                    List3 = [format_k_v(Key3, Val3) || {Key3, Val3} <- List2]
+            end,
 
+            [{KeyName, Val2} | List4];
+
+        {split, Separator, List} when is_list(List), Val==[]  ->
+            [];
+        {split, Separator, List} when is_list(List) ->
+            List2 = func:esc_split(Val, Separator),
+            [format_k_v(Key2, Val2) || {Key2, Val2} <- List2];
         {split, Separator, ip} ->
             [KeyName|_ValLi] = string:split(Val, Separator),
 
             Re = "\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}",
             {ok,MP} = re:compile(Re),
             {match,[[Ip]]} = re:run(Val, MP, [{capture,all, list},global]),
-
-            {KeyName, Ip};
+            Val2 = if
+                Ip==[] ->
+                    _ValLi;
+                true ->
+                    Ip
+            end,
+            {KeyName, Val2};
         {split, Separator, datetime} ->
             [KeyName|_ValLi] = string:split(Val, Separator),
 
@@ -263,8 +309,7 @@ format_k_v(Key, Val) when is_tuple(Key) ->
         {split, Separator, string} ->
             [KeyName|Val2] = string:split(Val, Separator),
             {KeyName, Val2}
-    end,
-    format_k_v(Item).
+    end.
 
 %% 过滤无效字符串 \" :
 format_k_v(Item) ->
@@ -283,7 +328,14 @@ format_k_v(Item) ->
             Item
     end.
 
-sent_to_msg_sender(Index, MsgMd5, Msg) ->
-    io:format("sent_to_msg_sender/ index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg]),
-    msg_sender:sent_to_es(Index, MsgMd5, Msg),
-    ok.
+sent_to_msg(Index, MsgMd5, Msg) ->
+    try
+        % io:format("try sent_to_msg/ index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg])
+        % ok
+        erlastic_search:index_doc_with_id(list_to_binary(Index), <<"doc">>, MsgMd5, Msg)
+    catch
+        Exception:Reason ->
+            io:format("sent_to_msg/ index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg]),
+            io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
+            {caught, Exception, Reason}
+    end.
