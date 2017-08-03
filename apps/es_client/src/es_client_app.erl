@@ -78,7 +78,6 @@ start_worker() ->
 %% Internal functions
 %%====================================================================
 
-%% private
 start_worker(Callback) when is_function(Callback) ->
     case application:get_env(es_client, scan_files) of
         {ok, List} ->

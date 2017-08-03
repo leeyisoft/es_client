@@ -1,3 +1,8 @@
+%%%-------------------------------------------------------------------
+%% @doc es_client public API
+%% @end
+%%%-------------------------------------------------------------------
+
 -module (file_scaner).
 
 -behaviour(gen_server).
@@ -15,6 +20,11 @@
 
 % for test
 -compile(export_all).
+
+
+%%====================================================================
+%% API
+%%====================================================================
 
 start_link(StartArgs) ->
     io:format("我是~p的子拥程 参数 ~p~n", [self(), StartArgs]),
@@ -58,8 +68,9 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%% private %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%%====================================================================
+%% Internal functions
+%%====================================================================
 
 %% 该函数功能是判断文件是否被重置 Nginx日志会被定期切割，被切割了之后，应该重新读取文件
 %% 修改日志内容多余400字符 应该被重置
@@ -90,7 +101,7 @@ scan_file(Item) ->
             Position = esc_db:get_last_position(FileMd5),
             % 获取文件大小
             FSize = filelib:file_size(File),
-            % Position>FSize 表示文件被切割了，应该重头读取
+
             NewPosition = new_position(Fd, Position, FSize),
             % io:format("我是子拥程~p scan_file Position ~p ~n", [self(), Position]),
 
@@ -98,7 +109,8 @@ scan_file(Item) ->
                 Multiline==false -> % 循环读取文件行
                     loop_read_file_line(Fd, Separator, Keys, Index, File);
                 true ->
-                    loop_read_file_multiline(File, Separator, Multiline, Keys, Index, Fd, NewPosition, FSize, 400)
+                    Param = {File, Separator, Multiline, Keys, Index, Fd, FSize},
+                    loop_read_file_multiline(NewPosition, 400, Param)
             end,
             file:close(Fd),
             case Res of
@@ -150,14 +162,15 @@ loop_read_file_line(Fd, Separator, Keys, Index, File) ->
             {error, Reason, Position}
     end.
 
-loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength) ->
+loop_read_file_multiline(StartPoistion, ReadLength, Param) ->
+    {File, Separator, Re, Keys, Index, Fd, FSize} = Param,
     case file:pread(Fd, StartPoistion, ReadLength) of
         {ok, Binary} ->
             {ok,MP} = re:compile(Re),
 
             case re:run(Binary, MP, [{capture,all,index},global]) of
                 {match, [_Head|[_Head|Tail]]} when length(Tail)>20 ->
-                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength - ReadLength div 2);
+                    loop_read_file_multiline(StartPoistion, ReadLength - ReadLength div 2, Param);
                 {match, List} when length(List)>1 -> % 至少两个记录
                     % io:format("~nBinary ~p: ~p~n", [StartPoistion, Binary]),
                     % io:format("~n StartPoistion : ~p, Len: ~p, List ~p,~n", [StartPoistion, length(List), List]),
@@ -192,11 +205,10 @@ loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FS
 
                     % 从新的位置继续读取
                     NewStartPoistion = lists:max(List2) + StartPoistion,
-                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, NewStartPoistion, FSize, ReadLength);
+                    loop_read_file_multiline(NewStartPoistion, ReadLength, Param);
                 {match, _} when FSize > (StartPoistion + ReadLength) -> % 只匹配一行记录
                     % io:format("~n not end StartPoistion ~p, 1 ReadLength ~p ~n", [StartPoistion, ReadLength]),
-                    NewLen = ReadLength * 3,
-                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, NewLen);
+                    loop_read_file_multiline(StartPoistion, ReadLength * 3, Param);
                 {match, _} -> % 最后一行了
                     MsgData = str_to_json(Binary, Separator, Keys, File),
                     % save to mnesia
@@ -209,7 +221,7 @@ loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FS
 
                     {eof, StartPoistion + Len};
                 nomatch ->
-                    loop_read_file_multiline(File, Separator, Re, Keys, Index, Fd, StartPoistion, FSize, ReadLength + ReadLength div 2)
+                    loop_read_file_multiline(StartPoistion, ReadLength + ReadLength div 2, Param)
             end;
         eof ->
             % io:format("StartPoistion ~p: ~p~n", [StartPoistion, Line]),
