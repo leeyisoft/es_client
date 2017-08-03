@@ -47,21 +47,16 @@ start() ->
     Res.
 
 get_last_position(NameMd5) ->
-    Res = mnesia:transaction(fun() ->
-        Q = qlc:q([[E#?LogFileTable.name_md5, E#?LogFileTable.last_position] || E <- mnesia:table(?LogFileTable), E#?LogFileTable.name_md5==NameMd5]),
-        qlc:e(Q)
-    end),
-    case Res of
-        {atomic,[]} ->
-            0;
-        {atomic, [[_Md5, Position]]} ->
-            Position
+    case mnesia:dirty_read(?LogFileTable, NameMd5) of
+        [{?LogFileTable, NameMd5, Position}] ->
+            Position;
+        _ ->
+            0
     end.
 
 
 save_logfile(FileMd5, Position) when is_integer(Position), Position >=0 ->
     mnesia:transaction(fun() ->
-
         Data = #?LogFileTable{
             name_md5=FileMd5,
             last_position=Position

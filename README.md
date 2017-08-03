@@ -93,6 +93,17 @@ mnesia:transaction(fun() ->
     qlc:e(Q)
 end).
 
+
+filelib:file_size("/Users/leeyi/workspace/tools/nginx/logs/task_log.log").
+esc_db:get_last_position("07cac3d69147445787f7493af965bdd9").
+
+mnesia:dirty_read(esc_logfile, "07cac3d69147445787f7493af965bdd9")
+
+
+observer:stop(), observer:start().
+
+application:start(es_client).
+
 ```
 
 ### 应用
@@ -164,7 +175,6 @@ observer:stop(), observer:start().
 
 application:start(es_client).
 
-esc_db:get_last_position("90a1b746a382dc494c3a960b5d3bdba5").
 
 f(),
 File = "/Users/leeyi/workspace/tools/nginx/logs/8085admin-local-error_test.log",
@@ -205,6 +215,46 @@ application:start(es_client).
 
 application:start(observer).
 
+
+```
+
+统计模块函数被调用次数
+```
+
+cprof:start(). % 启动性能分析器
+application:start(es_client). % 启动应用程序
+cprof:pause(). % 暂停性能分析器
+
+cprof:analyse(es_client_app). % 分析函数调用
+cprof:analyse(file_scaner).
+cprof:analyse(erlastic_search). % 分析函数调用
+
+cprof:analyse(). %分析所有统计到的模块
+
+cprof:stop(). % 停止性能分析器
+
+```
+
+测试代码覆盖 (重新启动erl运行)
+```
+
+cover:start(). % 启动覆盖分析器
+
+cover:compile('apps/es_client/src/es_client_app'). % 编译  es_client_app 进行覆盖分析
+cover:compile('apps/es_client/src/es_client_sup').
+cover:compile('apps/es_client/src/file_scaner').
+cover:compile('apps/es_client/src/func').
+cover:compile('apps/es_client/src/esc_db').
+
+application:start(es_client). % 运行程序
+
+cover:analyse_to_file(es_client_app). % 分析结果
+cover:analyse_to_file(file_scaner).
+cover:analyse_to_file(esc_db).
+cover:analyse_to_file(func).
+
+% 会输出 es_client_app.COVER.out 文件 ，用编辑器打开就可以看了
+% 文件“左侧数字”表示代码行被执行的次数，用0标注的表示没有被执行过
 ```
 
 ### 测试

@@ -117,7 +117,7 @@ nginx_error_msg_test() ->
                                                      {split,":",string},
                                                      {split,":",string}],
     Separator = "[,|\\[|\\]]+",
-    Vals = re:split(Str, Separator, [{return, list}]),
+    % Vals = re:split(Str, Separator, [{return, list}]),
     % Items = file_scaner:kv_to_erlastic_json(Keys, Vals).
 
     Items = file_scaner:str_to_json(Str, Separator, Keys),

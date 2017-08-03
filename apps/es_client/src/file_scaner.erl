@@ -58,7 +58,29 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%% private
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% private %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% 该函数功能是判断文件是否被重置 Nginx日志会被定期切割，被切割了之后，应该重新读取文件
+%% 修改日志内容多余400字符 应该被重置
+%% 重中间修改少于400字符的内容，为报异常
+%% 修改日志内容少于余400字符（在文件末尾修改）会重定位到文件末尾
+%% 修改文件内容多余400字符会重新读取文件
+new_position(Fd, Position, FSize) ->
+    if
+        Position =< FSize ->
+            % 把文件指针移到上次读取后的位置
+            file:position(Fd, {bof, Position}),
+            Position;
+        (Position - FSize) =< 400  ->
+            % 把文件指针移到文件末尾
+            file:position(Fd, {eof, 0}),
+            FSize;
+        true ->
+            % 把文件指针移到文件开始的文章
+            file:position(Fd, {bof, 0}),
+            0
+    end.
 
 scan_file(Item) ->
     {FileMd5, _Position, File, Separator, Multiline, Keys, Index} = Item,
@@ -68,19 +90,15 @@ scan_file(Item) ->
             Position = esc_db:get_last_position(FileMd5),
             % 获取文件大小
             FSize = filelib:file_size(File),
-            % if
-            %     Position>FSize ->
-            %         body
-            % end,
+            % Position>FSize 表示文件被切割了，应该重头读取
+            NewPosition = new_position(Fd, Position, FSize),
             % io:format("我是子拥程~p scan_file Position ~p ~n", [self(), Position]),
-            % 把文件指针移到上次读取后的位置
-            file:position(Fd, {bof, Position}),
 
             Res = if
                 Multiline==false -> % 循环读取文件行
                     loop_read_file_line(Fd, Separator, Keys, Index, File);
                 true ->
-                    loop_read_file_multiline(File, Separator, Multiline, Keys, Index, Fd, Position, FSize, 400)
+                    loop_read_file_multiline(File, Separator, Multiline, Keys, Index, Fd, NewPosition, FSize, 400)
             end,
             file:close(Fd),
             case Res of
@@ -95,7 +113,12 @@ scan_file(Item) ->
                     io:format("scan_file end Res ~p ~n", [Res])
             end,
             {ok, Res};
+        {error, enoent} -> % 文件被重命名的时候会这样
+            % 休眠11s
+            timer:sleep(11000),
+            scan_file(Item);
         {error, Why} ->
+            io:format("file:open/2 error: ~p ~n", [Why]),
             {error, Why}
     end.
 
@@ -210,6 +233,7 @@ str_to_json(Str, Separator, Keys, File) ->
         Exception:Reason ->
             io:format("~n catch str_to_json Separator: ~p, Keys: ~p, string: ~p~n~n~n", [Separator, Keys, Str]),
             io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
+            % 可以把这里的错误也发送到 es 里面去
             {caught, Exception, Reason}
     end.
 
@@ -244,14 +268,14 @@ format_k_v(Key, Val) when is_tuple(Key) ->
         {name, Name, string} ->
             {Name, Val};
 
-        {split, Separator, KLi} when is_list(KLi), Val==[] ->
+        {split, _Separator, KLi} when is_list(KLi), Val==[] ->
             [];
         {split, Separator, KLi} when is_list(KLi) ->
             VLi = func:esc_split(Val, Separator, all),
             List = func:esc_zip(KLi, VLi),
             [format_k_v(Key2, Val2) || {Key2, Val2} <- List];
         {split, Separator, _} ->
-            [_Key|Name] = func:esc_split(Val, Separator),
+            [_Key|Name] = string:split(Val, Separator),
             if
                 Name==[] ->
                     [];
@@ -270,20 +294,20 @@ format_k_v_split(Key, Val) ->
             ValList = string:split(string:trim(Val2, both, Separator2), Separator2, all),
             List = lists:sublist(ValList, length(KeyList)),
 
-            List4 = if
+            List3 = if
                 List==[] ->
                     [];
                 true ->
                     List2 = func:esc_zip(KeyList, List),
-                    List3 = [format_k_v(Key3, Val3) || {Key3, Val3} <- List2]
+                    [format_k_v(Key3, Val3) || {Key3, Val3} <- List2]
             end,
 
-            [{KeyName, Val2} | List4];
+            [{KeyName, Val2} | List3];
 
-        {split, Separator, List} when is_list(List), Val==[]  ->
+        {split, _Separator, List} when is_list(List), Val==[]  ->
             [];
         {split, Separator, List} when is_list(List) ->
-            List2 = func:esc_split(Val, Separator),
+            List2 = fstring:split(Val, Separator),
             [format_k_v(Key2, Val2) || {Key2, Val2} <- List2];
         {split, Separator, ip} ->
             [KeyName|_ValLi] = string:split(Val, Separator),
@@ -325,6 +349,7 @@ format_k_v(Item) ->
         [_H|_Tail] ->
             [format_k_v(Item2) || Item2 <- Item];
         _ ->
+            % 应该要把 Item 打印到日志文件里面，看看是什么东西
             Item
     end.
 

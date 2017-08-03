@@ -8,7 +8,11 @@
 -behaviour(application).
 
 %% Application callbacks
--export([start/2, stop/1]).
+-export([start/2
+    , stop/1
+
+    , start_worker/0
+]).
 
 % for test
 -compile(export_all).
@@ -41,6 +45,16 @@ start(_StartType, _StartArgs) ->
     Res = es_client_sup:start_link(),
 
     % 启动 worker
+    start_worker(),
+
+    % io:format("app ~p~n", [Res]),
+    Res.
+
+%%--------------------------------------------------------------------
+stop(_State) ->
+    ok.
+
+start_worker() ->
     start_worker(
         % Separator 为 "" 的标示为json格式数据
         % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
@@ -57,30 +71,28 @@ start(_StartType, _StartArgs) ->
             io:format("supervisor:start_child : ~p~n", [Res2]),
             Res2
         end
-    ),
+    ).
 
-    % io:format("app ~p~n", [Res]),
-    Res.
-
-%%--------------------------------------------------------------------
-stop(_State) ->
-    ok.
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
 %% private
-start_worker(Callback)->
+start_worker(Callback) when is_function(Callback) ->
     case application:get_env(es_client, scan_files) of
         {ok, List} ->
             % io:format("scan_files val: ~p~n", [List]),
-            [analysis_files_item(Item, Callback) || Item <- List];
+            List2 = lists:flatten([analysis_files_item(Item, Callback) || Item <- List]),
+            if
+                List2==[] ->
+                    io:format("can't find file from the es_client scan_flies~n");
+                true ->
+                    List2
+            end;
         undefined ->
             io:format("can't get scan_flies from es_client~n")
     end.
-
-
 
 %% 分析 scan_files 配置项
 analysis_files_item(Item, Callback) ->
@@ -129,7 +141,7 @@ analysis_files_item(Item, Callback) ->
                     Dir = filename:dirname(File),
                     BaseName = filename:basename(File),
                     FileList = filelib:fold_files(Dir, "."++BaseName, true, fun(F, AccIn) -> [F | AccIn] end, []),
-
+                    % io:format("FileList ~p~n", [FileList]),
                     [Callback(File2, Separator, Multiline, Keys, Index) || File2 <- FileList ];
                 true ->
                     Callback(File, Separator, Multiline, Keys, Index)

@@ -1,8 +1,6 @@
 -module (func).
 
 -export ([md5/1
-
-    , esc_split/2
     , esc_split/3
     , esc_zip/2
     , esc_read_line/3
@@ -20,23 +18,13 @@ esc_read_line(Fd, Start, Offset) ->
     {ok, Row} = file:pread(Fd, Start, Offset),
     Row.
 
-
-esc_split(Str, Separator) ->
-    CheckSeparator = string:find(Separator, "["),
-    if
-        CheckSeparator==nomatch ->
-            Vals = string:split(Str, Separator);
-        true ->
-            Vals = re:split(Str, Separator, [{return, list}])
-    end.
-
 esc_split(Str, Separator, Where) when is_atom(Where) ->
     CheckSeparator = string:find(Separator, "["),
     if
         CheckSeparator==nomatch ->
-            Vals = string:split(Str, Separator, Where);
+            string:split(Str, Separator, Where);
         true ->
-            Vals = re:split(Str, Separator, [{return, list}])
+            re:split(Str, Separator, [{return, list}])
     end.
 
 esc_zip(Keys, Vals) when is_list(Keys), is_list(Vals), length(Keys)>0, length(Vals)>0 ->
