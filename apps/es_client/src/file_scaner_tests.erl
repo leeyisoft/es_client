@@ -8,11 +8,6 @@ format_k_v_datetime_test() ->
     Val1 = "[2017-06-02 10:38:59] ",
     ?assertEqual({"createtime", "2017-06-02 10:38:59"}, file_scaner:format_k_v(Key1, Val1)).
 
-format_k_v_string_test() ->
-    Key2 = {split, ":", string},
-    Val2 = " upstream: \"fastcgi://127.0.0.1:9000\"",
-    ?assertEqual({"upstream", "fastcgi://127.0.0.1:9000"}, file_scaner:format_k_v(Key2, Val2)).
-
 
 format_k_v_3_test() ->
     Key3 = {split, ":", {split, " ", [
@@ -21,8 +16,7 @@ format_k_v_3_test() ->
                         {name,"http_protocol", string}
                     ]}},
     Val3 = " request: \"GET / HTTP/1.1\"",
-    % io:format("~p~n", [file_scaner:format_k_v(Key3, Val3)]).
-    ?assertEqual([{"request", "GET / HTTP/1.1"}, {"request_method", "GET"}, {"request_path", "/"}, {"http_protocol", "HTTP/1.1"}], file_scaner:format_k_v(Key3, Val3)).
+    io:format("~p~n", [file_scaner:format_k_v(Key3, Val3)]).
 
 
 taks_test() ->
@@ -64,7 +58,7 @@ nginx_error_info2_test() ->
       ],
     Separator = ", c",
     Vals = string:split(Str, Separator, all),
-    Items = file_scaner:kv_to_erlastic_json(Keys, Vals),
+    Items = file_scaner:kv_to_erlastic_json(Keys, Vals, "ddd"),
     io:format("~n~p~n", [Items]).
     % [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
 
@@ -91,7 +85,7 @@ nginx_error_info_test() ->
       ],
     Separator = ", c",
     Vals = string:split(Str, Separator, all),
-    Items = file_scaner:kv_to_erlastic_json(Keys, Vals),
+    Items = file_scaner:kv_to_erlastic_json(Keys, Vals, "test file"),
     io:format("~n~p~n", [Items]).
 
 
@@ -120,6 +114,6 @@ nginx_error_msg_test() ->
     % Vals = re:split(Str, Separator, [{return, list}]),
     % Items = file_scaner:kv_to_erlastic_json(Keys, Vals).
 
-    Items = file_scaner:str_to_json(Str, Separator, Keys),
+    Items = file_scaner:str_to_json(Str, Separator, Keys, "test file"),
     io:format("~n~p~n", [Items]).
 

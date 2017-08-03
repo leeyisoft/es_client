@@ -241,16 +241,29 @@ kv_to_erlastic_json(Keys, Vals, File) when is_list(Keys), is_list(Vals), length(
     KVList = func:esc_zip(Keys, Vals),
     % io:format("kv_to_erlastic_json Vals: ~p~n", [Vals]),
     % io:format("kv_to_erlastic_json KVList: ~p~n", [KVList]),
-    Items = [format_k_v(Key, Val) || {Key, Val} <- KVList],
+    Items = lists:flatten([format_k_v(Key, Val) || {Key, Val} <- KVList]),
     Items2 = [{"file", File} | Items],
     % io:format("kv_to_erlastic_json Items: ~p~n", [Items]),
-    [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- lists:flatten(Items2)].
+    [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- [filter_k_v(Item) || Item <- Items2]].
 
+%% 过滤无效字符串 "\" :\n\\"
+filter_k_v(Item) ->
+    FilterStr = "\" :\n\\",
+    case Item of
+        {Key1, Val1} ->
+            {string:trim(Key1, both, FilterStr), string:trim(Val1, both, FilterStr)};
+        [_H|_Tail] ->
+            [filter_k_v(Item2) || Item2 <- lists:flatten(Item)];
+        _ ->
+            % 应该要把 Item 打印到日志文件里面，看看是什么东西
+            io:format("format_k_v/1 Item ~p~n", [Item]),
+            Item
+    end.
 
 %% 格式化数据，按照 keys 配置的元组转换数据类型
 %% 返回的可能是 {K, V} 元组、空列表 []，也可能是 list [{K1,V1}, ...]
 format_k_v(Key, Val) when is_tuple(Key) ->
-    Item = case Key of
+    case Key of
         {name, Name, ip} ->
             Re = "\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}",
             {ok,MP} = re:compile(Re),
@@ -273,7 +286,7 @@ format_k_v(Key, Val) when is_tuple(Key) ->
         {split, Separator, KLi} when is_list(KLi) ->
             VLi = func:esc_split(Val, Separator, all),
             List = func:esc_zip(KLi, VLi),
-            [format_k_v(Key2, Val2) || {Key2, Val2} <- List];
+            lists:flatten([format_k_v(Key2, Val2) || {Key2, Val2} <- List]);
         {split, Separator, _} ->
             [_Key|Name] = string:split(Val, Separator),
             if
@@ -282,8 +295,7 @@ format_k_v(Key, Val) when is_tuple(Key) ->
                 true ->
                     format_k_v_split(Key, Val)
             end
-    end,
-    format_k_v(Item).
+    end.
 
 format_k_v_split(Key, Val) ->
     case Key of
@@ -335,32 +347,15 @@ format_k_v_split(Key, Val) ->
             {KeyName, Val2}
     end.
 
-%% 过滤无效字符串 \" :
-format_k_v(Item) ->
-    FilterStr = "\" :",
-    case Item of
-        {Key1, Val1} when is_list(Key1), is_list(Val1) ->
-            {string:trim(Key1), string:trim(Val1, both, FilterStr)};
-        {Key1, Val1} when is_list(Key1) ->
-
-            {string:trim(Key1), Val1};
-        {Key1, Val1} when is_list(Val1) ->
-            {Key1, string:trim(Val1, both, FilterStr)};
-        [_H|_Tail] ->
-            [format_k_v(Item2) || Item2 <- Item];
-        _ ->
-            % 应该要把 Item 打印到日志文件里面，看看是什么东西
-            Item
-    end.
 
 sent_to_msg(Index, MsgMd5, Msg) ->
     try
-        % io:format("try sent_to_msg/ index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg])
+        % io:format("try sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg])
         % ok
         erlastic_search:index_doc_with_id(list_to_binary(Index), <<"doc">>, MsgMd5, Msg)
     catch
         Exception:Reason ->
-            io:format("sent_to_msg/ index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg]),
+            io:format("sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg]),
             io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
             {caught, Exception, Reason}
     end.

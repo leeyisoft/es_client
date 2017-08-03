@@ -48,7 +48,7 @@
                         {split, ":", {split, " ", [
                             {name,"request_method", string},
                             {name,"request_path", string},
-                            {name,"http_protocol", string}
+                            {name,"http_version", string}
                         ]}},
                         {split, ":", string},
                         {split, ":", string}

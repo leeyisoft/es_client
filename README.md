@@ -205,8 +205,14 @@ lists:zip(ListA, List5).
 
 application:start(es_client).
 
-
+FilterStr = "\" :\n\\",
+Val1 = "http://127.0.0.1:8085/css/style.min.css?v=1.0\"\n".
+string:trim(Val1, both, FilterStr)
 ```
+
+ed0cd3aa1c3da577705ce9e08bd7240e
+
+ab3dc11a1ddc55a88b2320c143afe012
 
 ### 调试
 ```
@@ -239,8 +245,9 @@ cprof:stop(). % 停止性能分析器
 ```
 
 cover:start(). % 启动覆盖分析器
+% 编译  es_client_app 进行覆盖分析
 
-cover:compile('apps/es_client/src/es_client_app'). % 编译  es_client_app 进行覆盖分析
+cover:compile('apps/es_client/src/es_client_app').
 cover:compile('apps/es_client/src/es_client_sup').
 cover:compile('apps/es_client/src/file_scaner').
 cover:compile('apps/es_client/src/func').
