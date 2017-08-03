@@ -361,13 +361,45 @@ format_k_v_split(Key, Val) ->
 
 
 sent_to_msg(Index, MsgMd5, Msg) ->
+    Index2 = filter_index_name(Index),
     try
         % io:format("try sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg])
         % ok
-        erlastic_search:index_doc_with_id(list_to_binary(Index), <<"doc">>, MsgMd5, Msg)
+        erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"doc">>, MsgMd5, Msg)
     catch
         Exception:Reason ->
-            io:format("sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg]),
+            io:format("sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index2, MsgMd5, Msg]),
             io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
             {caught, Exception, Reason}
     end.
+
+filter_index_name(Index) when is_list(Index) ->
+    Re = "\\{[\\w|\\-|/]+\\}",
+    case re:run(Index, Re, [global, {capture, all, list}]) of
+        nomatch ->
+            Index;
+        {match, List} ->
+            filter_index_name(Index, List)
+    end.
+
+filter_index_name(Index, List) when length(List)==1 ->
+    [[Item|_]|_] = List,
+    {{Year, Month, Day}, _} = calendar:local_time(),
+    Ymd = case Item of
+        "{Y-m}" ->
+            lists:flatten( io_lib:format("~4..0w-~2..0w", [Year, Month]));
+        "{Y-m-d}" ->
+            lists:flatten( io_lib:format("~4..0w-~2..0w-~2..0w", [Year, Month, Day]));
+        "{Ym}" ->
+            lists:flatten( io_lib:format("~4..0w~2..0w", [Year, Month]));
+        "{Ymd}" ->
+            lists:flatten( io_lib:format("~4..0w~2..0w~2..0w", [Year, Month, Day]));
+        _ ->
+            Item
+    end,
+    re:replace(Index, Item, Ymd, [global, {return, list}]);
+
+filter_index_name(Index, [Item|Tail]=List) when length(List)>1 ->
+    Index2 = filter_index_name(Index, [Item]),
+    filter_index_name(Index2, Tail).
+

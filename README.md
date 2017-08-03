@@ -208,12 +208,13 @@ application:start(es_client).
 FilterStr = "\" :\n\\",
 Val1 = "http://127.0.0.1:8085/css/style.min.css?v=1.0\"\n".
 string:trim(Val1, both, FilterStr)
+
+Index = "test-index-{Y-m-d}-{Y}",
+re:replace(Index, "{Y-m-d}", "2017-02-10", [global, {return, list}]).
+
 ```
 
-ed0cd3aa1c3da577705ce9e08bd7240e
-
-ab3dc11a1ddc55a88b2320c143afe012
-
+calendar:now_to_universal_time(os:timestamp()).
 ### 调试
 ```
 observer:start().

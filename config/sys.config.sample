@@ -20,7 +20,7 @@
             #{ % 必须是 erlang maps
                 separator=>"",
                 multiline=>false,
-                index=>"test-nginx-access",
+                index=>"test-nginx-access-{Ymd}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/*access.log"
             },
             #{
@@ -31,7 +31,7 @@
                     {name, "message", string}
                 ],
                 multiline=>false,
-                index=>"test-afd-task",
+                index=>"test-afd-task-{Y-m-d}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/task_log.log"
             },
             #{ % for nginx error
@@ -55,7 +55,7 @@
                     ]}
                 ],
                 multiline=>"\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}",
-                index=>"test-nginx-error",
+                index=>"test-nginx-error-{Y-m-d}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/*error.log"
             }
         ]}

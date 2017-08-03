@@ -117,3 +117,6 @@ nginx_error_msg_test() ->
     Items = file_scaner:str_to_json(Str, Separator, Keys, "test file"),
     io:format("~n~p~n", [Items]).
 
+filter_index_name_test() ->
+    Index = "test-index-{Ymd}-{Y-m-d}-{Ym}-{Y}",
+    file_scaner:filter_index_name(Index).
