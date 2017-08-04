@@ -9,9 +9,6 @@
 
 -export ([]).
 
-% disc_copies 磁盘 + 内存; ram_copies 内存
-% 生产环境用 disc_copies ， 开发环境用 ram_copies
--define(TableCopies, ram_copies).
 -define (LogFileTable, esc_logfile).
 
 -record(?LogFileTable, {
@@ -25,8 +22,8 @@ start() ->
         true ->
             alread_created_schema;
         _ ->
-            % mnesia:delete_schema([node()]).
-            mnesia:create_schema([node()])
+            % mnesia:delete_schema([node()|nodes()]).
+            mnesia:create_schema([node()|nodes()])
     end,
 
     application:start(mnesia),
@@ -35,9 +32,15 @@ start() ->
     % 确保已经 mnesia:start().
     Res = case lists:member(?LogFileTable, mnesia:system_info(tables)) of
         false ->
+            TableCopies = case application:get_env(es_client, table_copies) of
+                {ok, Copies} ->
+                    Copies;
+                undefined ->
+                    disc_copies
+            end,
             % 创建表
             mnesia:create_table(?LogFileTable, [{type, set},
-                           {?TableCopies, [node()]}, % disc_copies 磁盘 + 内存; ram_copies 内存
+                           {TableCopies, [node()|nodes()]}, % disc_copies 磁盘 + 内存; ram_copies 内存
                            {attributes, record_info(fields, ?LogFileTable)}]);
         _ ->
             alread_created_table

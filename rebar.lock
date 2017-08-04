@@ -4,9 +4,11 @@
   {git,"https://github.com/leeyisoft/erlastic_search.git",
        {ref,"08d980c48b74fad3cee27aeb119c1a65c9fd1d91"}},
   0},
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"hackney">>,{pkg,<<"hackney">>,<<"1.8.6">>},1},
  {<<"idna">>,{pkg,<<"idna">>,<<"5.0.2">>},2},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.2">>},1},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.5.1">>},0},
  {<<"metrics">>,{pkg,<<"metrics">>,<<"1.0.1">>},2},
  {<<"mimerl">>,{pkg,<<"mimerl">>,<<"1.0.2">>},2},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.1">>},2},
@@ -14,9 +16,11 @@
 [
 {pkg_hash,[
  {<<"certifi">>, <<"C3904F192BD5284E5B13F20DB3CEAC9626E14EEACFBB492E19583CF0E37B22BE">>},
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
  {<<"hackney">>, <<"21A725DB3569B3FB11A6AF17D5C5F654052CE9624219F1317E8639183DE4A423">>},
  {<<"idna">>, <<"AC203208ADA855D95DC591A764B6E87259CB0E2A364218F215AD662DAA8CD6B4">>},
  {<<"jsx">>, <<"7ACC7D785B5ABE8A6E9ADBDE926A24E481F29956DD8B4DF49E3E4E7BCC92A018">>},
+ {<<"lager">>, <<"63897A61AF646C59BB928FEE9756CE8BDD02D5A1A2F3551D4A5E38386C2CC071">>},
  {<<"metrics">>, <<"25F094DEA2CDA98213CECC3AEFF09E940299D950904393B2A29D191C346A8486">>},
  {<<"mimerl">>, <<"993F9B0E084083405ED8252B99460C4F0563E41729AB42D9074FD5E52439BE88">>},
  {<<"ssl_verify_fun">>, <<"28A4D65B7F59893BC2C7DE786DEC1E1555BD742D336043FE644AE956C3497FBE">>},

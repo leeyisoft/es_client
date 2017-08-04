@@ -18,15 +18,19 @@ Erlang/OTP 20 [erts-9.0] [source] [64-bit] [smp:4:4] [ds:4:4:10] [async-threads:
 ### 编译启动
 ```
 % 编译
-rm -rf _build && rm -rf rebar.lock && ./rebar3 compile
+./rebar3 clean && ./rebar3 compile
 
 % 启动
 erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
 
 
-./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client -mnesia dir '"mnesia.db"'
+./rebar3 clean && ./rebar3 compile && erl -boot mnesia \
+    -pa _build/default/lib/*/ebin -config config/sys.config \
+    -sname es_client -mnesia dir '"mnesia.db"'
 
-./rebar3 compile && erl -pa _build/default/lib/*/ebin -config config/sys.config -sname es_client3 -mnesia dir '"mnesia.db3"'
+./rebar3 clean && ./rebar3 compile && erl \
+    -pa _build/default/lib/*/ebin -config config/sys.config \
+    -sname es_client -mnesia dir '"mnesia.db"'
 
 需要添加 scan_files 配置项检查的功能，便于检查用户是否真的配置好了;
 需要添加 reload 配置的功能；
@@ -191,26 +195,6 @@ observer:start().
 
 observer:stop(), observer:start().
 
-StartPoistion = 133,
-f(),
-List = [[{0,19}],[{407,19}],[{558,19}]].
-List2 = [Len || [{Len, _}] <- List],
-List3 = lists:reverse(List2),
-[_|List4] = List3,
-[_|ListB] = List2,
-ListA = lists:reverse(List4),
-List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
-
-lists:zip(ListA, List5).
-
-application:start(es_client).
-
-FilterStr = "\" :\n\\",
-Val1 = "http://127.0.0.1:8085/css/style.min.css?v=1.0\"\n".
-string:trim(Val1, both, FilterStr)
-
-Index = "test-index-{Y-m-d}-{Y}",
-re:replace(Index, "{Y-m-d}", "2017-02-10", [global, {return, list}]).
 
 ```
 
@@ -270,4 +254,38 @@ cover:analyse_to_file(func).
 ./rebar3 eunit
 ```
 
+### 发布
 
+```
+rebar3 as product release
+
+rebar3 as prod tar
+
+rebar3 as centos-7 tar
+
+scp _build/centos-7/rel/es_client/es_client-0.1.0.tar.gz root@192.168.2.207:/usr/local/es_client/
+
+mkdir -p /usr/local/es_client
+
+mv es_client-0.1.0.tar.gz /usr/local/es_client/
+
+cd /usr/local/es_client
+
+tar -xvf es_client-0.1.0.tar.gz
+
+echo ''> releases/0.1.0/sys.config && vim releases/0.1.0/sys.config
+
+bin/es_client console
+
+bin/es_client start
+```
+
+{include_erts, false} ，开发时使用这个配置，在执行 rebar3 release 时，只是创建一个ERTS的软链接，省下了拷贝文件的时间。在生产环境下，你可以创建一个product的profile，里面定义 {include_erts, true} ，这样执行 rebar3 as product release 时，ERTS会被拷贝到发布文件夹中，在服务器上部署不需要安装Erlang。
+
+首先目标主机需要安装 erlang/otp 我这里安装
+
+首先在centos7上面源码安装erlang/otp 20
+之后把安装好的打包，下载到本地
+
+https://www.rebar3.org/v3.0/docs/publishing-packages
+https://github.com/erlang/rebar3/issues/954

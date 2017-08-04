@@ -7,6 +7,9 @@
   {mod, { es_client_app, []}},
 
   % 注意这个配置节是指定当前应用程序依赖哪些应用程序,类似Windows服务的依赖关系
+  % 发布release的依赖
+  % {applications, [kernel,stdlib,jsx,erlastic_search,mnesia]},
+  % local 的依赖
   {applications, [kernel,stdlib]},
   {env,[]},
   {modules, [file_scaner, esc_db,func]},

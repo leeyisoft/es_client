@@ -16,11 +16,16 @@
     % separator = "" 每行记录为json格式数据
     %
     { es_client, [
+
+        % 生产环境用 disc_copies ， 开发环境用 ram_copies
+        {table_copies, disc_copies},
+
+        % 需要扫描的日志文件信息
         {scan_files, [
             #{ % 必须是 erlang maps
                 separator=>"",
                 multiline=>false,
-                index=>"test-nginx-access-{Ymd}",
+                index=>"filebeat-esc-test-nginx-access-{Ymd}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/*access.log"
             },
             #{
@@ -31,11 +36,11 @@
                     {name, "message", string}
                 ],
                 multiline=>false,
-                index=>"test-afd-task-{Y-m-d}",
+                index=>"filebeat-esc-test-afd-task-{Y-m-d}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/task_log.log"
             },
             #{ % for nginx error
-                separator=>", c",
+                separator=>", cl",
                 keys=>[
                     {split,"[\\[|\\]]+", [
                         {name, "createtime", datetime},
@@ -55,7 +60,7 @@
                     ]}
                 ],
                 multiline=>"\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}",
-                index=>"test-nginx-error-{Y-m-d}",
+                index=>"filebeat-esc-test-nginx-error-{Y-m-d}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/*error.log"
             }
         ]}

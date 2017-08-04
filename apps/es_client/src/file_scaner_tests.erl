@@ -36,27 +36,26 @@ taks_test() ->
     % [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
 
 nginx_error_info2_test() ->
-    Str = "2017/06/14 09:42:12 [info] 70237#0: *5527 kevent() reported that client prematurely closed connection, so upstream connection is closed too while sending request to upstream, client: 127.0.0.1, server: admin.afd56.local, request: \"GET /card/recharge-order/add HTTP/1.1\", upstream: \"fastcgi://127.0.0.1:9000\", host: \"127.0.0.1:8085\"\n",
+    Str = "2017/07/24 10:38:25 [error] 4697#0: *58047 FastCGI sent in stderr: \"PHP message: PHP Fatal error:  Uncaught TypeError: Argument 1 passed to Topxia\\Common\\ArrayToolkit::column() must be of the type array, string given, called in /data/wwwroot/default/edu.afd56.com.cn/src/Topxia/Service/User/Impl/UserServiceImpl.php on line 272 and defined in /data/wwwroot/default/edu.afd56.com.cn/src/Topxia/Common/ArrayToolkit.php:15\nStack trace:\n#0 /data/wwwroot/default/edu.afd56.com.cn/src/Topxia/Service/User/Impl/UserServiceImpl.php(272): Topxia\\Common\\ArrayToolkit::column('<!DOCTYPE html>...', 'id')\n#1 /data/wwwroot/default/edu.afd56.com.cn/src/Topxia/WebBundle/Controller/SettingsController.php(191): Topxia\\Service\\User\\Impl\\UserServiceImpl->changeAvatar('57', '<!DOCTYPE html>...')\n#2 [internal function]: Topxia\\WebBundle\\Controller\\SettingsController->avatarCropModalAction(Object(Symfony\\Component\\HttpFoundation\\Request))\n#3 /data/wwwroot/default/edu.afd56.com.cn/vendor/symfony/symfony/src/Symfony/Component/HttpKernel/HttpKernel.php(144): call_user_func_array(Array, Array)\n#4 /data/ww\" while reading response header from upstream, client: 192.168.8.109, server: edu.dev.afd56.com.cn, request: \"POST /settings/avatar/crop/modal HTTP/1.1\", upstream: \"fastcgi://unix:/dev/shm/php-cgi.sock:\", host: \"edu.dev.afd56.com.cn\", referrer: \"http://edu.dev.afd56.com.cn/course/create\"\n",
 
-    Keys = [
-        {split,"[\\[|\\]]+", [
-            {name, "createtime", datetime},
-            {name, "level", string},
-            {name, "message", string}
-        ]},
-        {split, ",", [
-            {split, ":", ip},
-            {split, ":", string},
-            {split, ":", {split, " ", [
-                {name,"request_method", string},
-                {name,"request_path", string},
-                {name,"http_protocol", string}
-            ]}},
-            {split, ":", string},
-            {split, ":", string}
-        ]}
-      ],
-    Separator = ", c",
+    Keys = [{split,"[\\[|\\]]+",
+                                                 [{name,"createtime",datetime},
+                                                  {name,"level",string},
+                                                  {name,"message",string}]},
+                                                {split,",",
+                                                 [{split,":",ip},
+                                                  {split,":",string},
+                                                  {split,":",
+                                                   {split," ",
+                                                    [{name,"request_method",
+                                                      string},
+                                                     {name,"request_path",string},
+                                                     {name,"http_version",
+                                                      string}]}},
+                                                  {split,":",string},
+                                                  {split,":",string}]}],
+
+    Separator = ", cl",
     Vals = string:split(Str, Separator, all),
     Items = file_scaner:kv_to_erlastic_json(Keys, Vals, "ddd"),
     io:format("~n~p~n", [Items]).
@@ -120,3 +119,8 @@ nginx_error_msg_test() ->
 filter_index_name_test() ->
     Index = "test-index-{Ymd}-{Y-m-d}-{Ym}-{Y}",
     file_scaner:filter_index_name(Index).
+
+nginx_access_test() ->
+    Str = "{ \"@timestamp\": \"19/Jul/2017:17:47:48 +0800\", \"http_host\": \"edu.dev.afd56.com.cn\", \"http_x_forwarded_for\": \"-\", \"request\": \"GET /assets/v2/img/righ_low.png HTTP/1.1\", \"status\": 200, \"remote_addr\": \"192.168.8.142\", \"remote_user\": \"-\", \"request_body\": \"-\", \"content_length\": \"-\", \"request_time\": 0.000, \"request_method\": \"GET\", \"http_referrer\": \"http://edu.dev.afd56.com.cn/assets/v2/css/main.css?7.5.22\", \"body_bytes_sent\": 472, \"http_user_agent\": \"Mozilla/5.0 (Linux; U; Android 4.4.4; zh-cn; HUAWEI Y635-CL00 Build/HuaweiY635-CL00) AppleWebKit/537.36 (KHTML, like Gecko)Version/4.0 Chrome/37.0.0.0 MQQBrowser/6.9 Mobile Safari/537.36\", \"upstream_response_time\": \"-\" }\n",
+    jsx:decode(list_to_binary(Str)).
+

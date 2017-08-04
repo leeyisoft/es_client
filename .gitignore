@@ -22,3 +22,4 @@ apps/es_client/doc
 TEST*.xml
 *.out
 Mnesia.nonode@nohost
+prod.config
