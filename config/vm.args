@@ -1,5 +1,7 @@
 -sname es_client
 
+-mnesia dir '"mnesia.db"'
+
 -setcookie es_client_cookie
 
 +K true

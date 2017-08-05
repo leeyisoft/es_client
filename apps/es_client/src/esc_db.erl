@@ -16,6 +16,8 @@
 }).
 
 start() ->
+    % 不过 mnesia 是否启动这里都先停止它，便于下面初始化成功
+    application:stop(mnesia),
     % mnesia检查数据库是否创建
     % 确保先创建 schema 之后再启动 mnesia
     case mnesia:system_info(use_dir) of

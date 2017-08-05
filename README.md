@@ -273,8 +273,6 @@ cd /usr/local/es_client
 
 tar -xvf es_client-0.1.0.tar.gz
 
-echo ''> releases/0.1.0/sys.config && vim releases/0.1.0/sys.config
-
 bin/es_client console
 
 bin/es_client start
