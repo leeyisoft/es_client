@@ -125,9 +125,11 @@ scan_file(Item) ->
                     io:format("scan_file end Res ~p ~n", [Res])
             end,
             {ok, Res};
-        {error, enoent} -> % 文件被重命名的时候会这样
+        {error, enoent} -> % enoent 表示文件不存在了，文件被重命名的时候会这样
             % 休眠11s
             timer:sleep(11000),
+            % 需要重头开始读取文件
+            esc_db:save_logfile(FileMd5, 0),
             scan_file(Item);
         {error, Why} ->
             io:format("file:open/2 error: ~p ~n", [Why]),
