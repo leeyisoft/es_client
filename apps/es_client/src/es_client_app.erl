@@ -57,7 +57,7 @@ start_worker() ->
         % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
         fun(File, Separator, Multiline, Keys, Index) ->
             % io:format("es_client start_worker : ~p~n", [[File, Multiline, Separator]]),
-            FileMd5 = func:md5(File),
+            FileMd5 = esc_func:md5(File),
             % io:format("FileMd5 : ~p~n", [FileMd5]),
             Position = esc_db:get_last_position(FileMd5),
             esc_db:save_logfile(FileMd5, Position),

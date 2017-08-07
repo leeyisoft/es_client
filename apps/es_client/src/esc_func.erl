@@ -1,4 +1,4 @@
--module (func).
+-module (esc_func).
 
 -export ([md5/1
     , esc_split/3

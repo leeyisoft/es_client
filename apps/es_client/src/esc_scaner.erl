@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module (file_scaner).
+-module (esc_scaner).
 
 -behaviour(gen_server).
 
@@ -149,7 +149,7 @@ loop_read_file_line(Fd, Separator, Keys, Index, File) ->
         {ok, "\n"} ->
             loop_read_file_line(Fd, Separator, Keys, Index, File);
         {ok, Line2} ->
-            RowId = func:md5(Line2),
+            RowId = esc_func:md5(Line2),
             io:format("Position ~p RowId ~p ~n", [Position, RowId]),
             % io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
@@ -199,9 +199,9 @@ loop_read_file_multiline(StartPoistion, ReadLength, Param) ->
                     List5 = [ B - A || {B, A} <- lists:zip(ListB, ListA) ],
 
                     % 计算每个记录的开始位置和长度, 根据每个记录的开始位置和长度读取记录
-                    Rows = [func:esc_read_line(Fd, StartPoistion + Start, Offset) || {Start,Offset} <- lists:zip(ListA, List5)],
+                    Rows = [esc_func:esc_read_line(Fd, StartPoistion + Start, Offset) || {Start,Offset} <- lists:zip(ListA, List5)],
                     % 把记录转换成 erlastic_json() 类型的数据
-                    DataList = [{func:md5(Str), str_to_json(Str, Separator, Keys, File)} || Str <- Rows],
+                    DataList = [{esc_func:md5(Str), str_to_json(Str, Separator, Keys, File)} || Str <- Rows],
                     % 发送数据到 es
                     [sent_to_msg(Index, RowId, MsgData) || {RowId, MsgData} <- DataList],
 
@@ -214,7 +214,7 @@ loop_read_file_multiline(StartPoistion, ReadLength, Param) ->
                 {match, _} -> % 最后一行了
                     MsgData = str_to_json(Binary, Separator, Keys, File),
                     % save to mnesia
-                    RowId = func:md5(Binary),
+                    RowId = esc_func:md5(Binary),
                     sent_to_msg(Index, RowId, MsgData),
                     % msg_sender:sent_to_es(Index, RowId, MsgData),
 
@@ -240,7 +240,7 @@ str_to_json(Str, Separator, Keys, File) ->
             Separator==[] ->
                 jsx:decode(list_to_binary(Str));
             true ->
-                Vals = func:esc_split(Str, Separator, all),
+                Vals = esc_func:esc_split(Str, Separator, all),
                 kv_to_erlastic_json(Keys, Vals, File)
         end
     catch
@@ -252,7 +252,7 @@ str_to_json(Str, Separator, Keys, File) ->
     end.
 
 kv_to_erlastic_json(Keys, Vals, File) when is_list(Keys), is_list(Vals), length(Keys)>0, length(Vals)>0 ->
-    KVList = func:esc_zip(Keys, Vals),
+    KVList = esc_func:esc_zip(Keys, Vals),
     % io:format("kv_to_erlastic_json Vals: ~p~n", [Vals]),
     % io:format("kv_to_erlastic_json KVList: ~p~n", [KVList]),
     Items = lists:flatten([format_k_v(Key, Val) || {Key, Val} <- KVList]),
@@ -298,8 +298,8 @@ format_k_v(Key, Val) when is_tuple(Key) ->
         {split, _Separator, KLi} when is_list(KLi), Val==[] ->
             [];
         {split, Separator, KLi} when is_list(KLi) ->
-            VLi = func:esc_split(Val, Separator, all),
-            List = func:esc_zip(KLi, VLi),
+            VLi = esc_func:esc_split(Val, Separator, all),
+            List = esc_func:esc_zip(KLi, VLi),
             lists:flatten([format_k_v(Key2, Val2) || {Key2, Val2} <- List]);
         {split, Separator, _} ->
             [_Key|Name] = string:split(Val, Separator),
@@ -324,7 +324,7 @@ format_k_v_split(Key, Val) ->
                 List==[] ->
                     [];
                 true ->
-                    List2 = func:esc_zip(KeyList, List),
+                    List2 = esc_func:esc_zip(KeyList, List),
                     [format_k_v(Key3, Val3) || {Key3, Val3} <- List2]
             end,
 

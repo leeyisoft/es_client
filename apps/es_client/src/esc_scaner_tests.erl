@@ -1,4 +1,4 @@
--module (file_scaner_tests).
+-module (esc_scaner_tests).
 
 % eunit 引入 放在 include es_client 之后
 -include_lib("eunit/include/eunit.hrl").
@@ -6,7 +6,7 @@
 format_k_v_datetime_test() ->
     Key1 = {name, "createtime", datetime},
     Val1 = "[2017-06-02 10:38:59] ",
-    ?assertEqual({"createtime", "2017-06-02 10:38:59"}, file_scaner:format_k_v(Key1, Val1)).
+    ?assertEqual({"createtime", "2017-06-02 10:38:59"}, esc_scaner:format_k_v(Key1, Val1)).
 
 
 format_k_v_3_test() ->
@@ -16,7 +16,7 @@ format_k_v_3_test() ->
                         {name,"http_protocol", string}
                     ]}},
     Val3 = " request: \"GET / HTTP/1.1\"",
-    io:format("~p~n", [file_scaner:format_k_v(Key3, Val3)]).
+    io:format("~p~n", [esc_scaner:format_k_v(Key3, Val3)]).
 
 
 taks_test() ->
@@ -31,7 +31,7 @@ taks_test() ->
     Vals = string:split(Str, Separator, all),
     Vals2 = lists:sublist(Vals, length(Keys)),
     % io:format("~p~n", [Vals]).
-    Items = [file_scaner:format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, Vals2)],
+    Items = [esc_scaner:format_k_v(Key, Val) || {Key, Val} <- lists:zip(Keys, Vals2)],
     io:format("~n~p~n", [ lists:flatten(Items)]).
     % [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
 
@@ -57,7 +57,7 @@ nginx_error_info2_test() ->
 
     Separator = ", cl",
     Vals = string:split(Str, Separator, all),
-    Items = file_scaner:kv_to_erlastic_json(Keys, Vals, "ddd"),
+    Items = esc_scaner:kv_to_erlastic_json(Keys, Vals, "ddd"),
     io:format("~n~p~n", [Items]).
     % [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- Items]
 
@@ -84,7 +84,7 @@ nginx_error_info_test() ->
       ],
     Separator = ", c",
     Vals = string:split(Str, Separator, all),
-    Items = file_scaner:kv_to_erlastic_json(Keys, Vals, "test file"),
+    Items = esc_scaner:kv_to_erlastic_json(Keys, Vals, "test file"),
     io:format("~n~p~n", [Items]).
 
 
@@ -111,14 +111,14 @@ nginx_error_msg_test() ->
                                                      {split,":",string}],
     Separator = "[,|\\[|\\]]+",
     % Vals = re:split(Str, Separator, [{return, list}]),
-    % Items = file_scaner:kv_to_erlastic_json(Keys, Vals).
+    % Items = esc_scaner:kv_to_erlastic_json(Keys, Vals).
 
-    Items = file_scaner:str_to_json(Str, Separator, Keys, "test file"),
+    Items = esc_scaner:str_to_json(Str, Separator, Keys, "test file"),
     io:format("~n~p~n", [Items]).
 
 filter_index_name_test() ->
     Index = "test-index-{Ymd}-{Y-m-d}-{Ym}-{Y}",
-    file_scaner:filter_index_name(Index).
+    esc_scaner:filter_index_name(Index).
 
 nginx_access_test() ->
     Str = "{ \"@timestamp\": \"19/Jul/2017:17:47:48 +0800\", \"http_host\": \"edu.dev.afd56.com.cn\", \"http_x_forwarded_for\": \"-\", \"request\": \"GET /assets/v2/img/righ_low.png HTTP/1.1\", \"status\": 200, \"remote_addr\": \"192.168.8.142\", \"remote_user\": \"-\", \"request_body\": \"-\", \"content_length\": \"-\", \"request_time\": 0.000, \"request_method\": \"GET\", \"http_referrer\": \"http://edu.dev.afd56.com.cn/assets/v2/css/main.css?7.5.22\", \"body_bytes_sent\": 472, \"http_user_agent\": \"Mozilla/5.0 (Linux; U; Android 4.4.4; zh-cn; HUAWEI Y635-CL00 Build/HuaweiY635-CL00) AppleWebKit/537.36 (KHTML, like Gecko)Version/4.0 Chrome/37.0.0.0 MQQBrowser/6.9 Mobile Safari/537.36\", \"upstream_response_time\": \"-\" }\n",
