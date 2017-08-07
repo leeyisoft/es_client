@@ -11,7 +11,7 @@
 -export([start/2
     , stop/1
 
-    , start_worker/0
+    , start_scaner/0
 ]).
 
 %%====================================================================
@@ -42,7 +42,7 @@ start(_StartType, _StartArgs) ->
     Res = es_client_sup:start_link(),
 
     % 启动 worker
-    start_worker(),
+    start_scaner(),
 
     % io:format("app ~p~n", [Res]),
     Res.
@@ -51,43 +51,46 @@ start(_StartType, _StartArgs) ->
 stop(_State) ->
     ok.
 
-start_worker() ->
-    start_worker(
+start_scaner() ->
+    Res = start_scaner(
         % Separator 为 "" 的标示为json格式数据
         % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
         fun(File, Separator, Multiline, Keys, Index) ->
-            % io:format("es_client start_worker : ~p~n", [[File, Multiline, Separator]]),
+            % io:format("es_client start_scaner : ~p~n", [[File, Multiline, Separator]]),
             FileMd5 = esc_func:md5(File),
             % io:format("FileMd5 : ~p~n", [FileMd5]),
-            Position = esc_db:get_last_position(FileMd5),
-            esc_db:save_logfile(FileMd5, Position),
 
             % start_child
-            StartArgs = {FileMd5, Position, File, Separator, Multiline, Keys, Index},
+            StartArgs = {FileMd5, File, Separator, Multiline, Keys, Index},
             Res2 = supervisor:start_child(es_client_sup, [StartArgs]),
-            io:format("supervisor:start_child : ~p~n", [Res2]),
-            Res2
+            io:format("supervisor:start_child/2 : ~p~n", [Res2]),
+            {FileMd5, File}
         end
-    ).
+    ),
+    supervisor:start_child(es_client_sup, [{esc_check_scaner, {check_list, Res}}]),
+    % io:format("start_scaner/0 : ~p~n", [Res]),
+    ok.
 
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
-start_worker(Callback) when is_function(Callback) ->
+start_scaner(Callback) when is_function(Callback) ->
     case application:get_env(es_client, scan_files) of
         {ok, List} ->
             % io:format("scan_files val: ~p~n", [List]),
             List2 = lists:flatten([analysis_files_item(Item, Callback) || Item <- List]),
             if
                 List2==[] ->
-                    io:format("can't find file from the es_client scan_flies~n");
+                    io:format("can't find file from the es_client scan_flies~n"),
+                    error;
                 true ->
                     List2
             end;
         undefined ->
-            io:format("can't get scan_flies from es_client~n")
+            io:format("can't get scan_flies from es_client~n"),
+            error
     end.
 
 %% 分析 scan_files 配置项

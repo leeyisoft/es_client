@@ -27,17 +27,42 @@ erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
     -pa _build/default/lib/*/ebin -config config/sys.config \
     -sname es_client -mnesia dir '"mnesia.db"'
 
+
+./rebar3 clean && ./rebar3 compile && erl \
+    -pa _build/default/lib/*/ebin -config config/sys.config \
+    -sname es_client2 -mnesia dir '"mnesia.db2"'
+
 需要添加 scan_files 配置项检查的功能，便于检查用户是否真的配置好了;
 需要添加 reload 配置的功能；
 
 observer:start().
 application:start(es_client).
 
+
+esc_db:get_last_position("2a68be7fed46cc80ed9794c77a0041fa").
+filelib:file_size("/Users/leeyi/workspace/tools/wwwlogs/admin.dev.afd56.com.cn.access.log").
+
+InitArgs={"2a68be7fed46cc80ed9794c77a0041fa",0,
+ "/Users/leeyi/workspace/tools/wwwlogs/admin.dev.afd56.com.cn.access.log",[],
+ false,"unset_keys","filebeat-esc-test-nginx-access-{Ymd}"},
+gen_server:cast(whereis('2a68be7fed46cc80ed9794c77a0041fa'), InitArgs).
+
+
+InitArgs={"07cac3d69147445787f7493af965bdd9",0,
+ "/Users/leeyi/workspace/tools/nginx/logs/task_log.log"},
+gen_server:cast(whereis('07cac3d69147445787f7493af965bdd9'), []).
+
+
+sys:get_status('07cac3d69147445787f7493af965bdd9').
+sys:get_state('d200bf5f811538c314a866b6308e0b3d').
+
+process_info(whereid('07cac3d69147445787f7493af965bdd9'),status).
+
 observer:stop(), observer:start().
 
 erlang:is_process_alive(<0.100.0>).
 
-whereis('90a1b746a382dc494c3a960b5d3bdba5').
+whereis('07cac3d69147445787f7493af965bdd9').
 
 
 application:start(mnesia).

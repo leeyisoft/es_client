@@ -26,9 +26,12 @@
 %% API
 %%====================================================================
 
+start_link({Name, StartArgs}) ->
+    gen_server:start_link({local, Name}, ?MODULE, StartArgs, []);
+
 start_link(StartArgs) ->
     io:format("我是~p的子拥程 参数 ~p~n", [self(), StartArgs]),
-    {FileMd5, _Position, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs,
+    {FileMd5, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs,
     gen_server:start_link({local, list_to_atom(FileMd5)}, ?MODULE, StartArgs, []).
 
 init(InitArgs) ->
@@ -49,6 +52,11 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
+
+handle_cast({check_list, List}, State) when length(List)>0 ->
+    % io:format("check_list pid ~p, State ~p~n", [self(), State]),
+    check_scaner(List),
+    {noreply, State};
 handle_cast(Msg, State) ->
     Pid = self(),
     % io:format("我是子拥程~p Msg ~p ~n", [Pid, Msg]),
@@ -72,6 +80,35 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %%====================================================================
 
+check_scaner(List) when is_list(List) ->
+    % io:format("check_scaner/1 list pid ~p , List ~p~n", [self(), List]),
+    [check_scaner(Item) || Item <- List],
+    % 休眠5s
+    timer:sleep(5000),
+    check_scaner(List);
+
+check_scaner({FileMd5, File}) ->
+    % 从数据库读取
+    Position = esc_db:get_last_position(FileMd5),
+    % 获取文件大小
+    FSize = filelib:file_size(File),
+    % Msg = "check_scaner/1 tuple , FSize ~p , Position ~p , FSize>Position : ~p ~n",
+    % io:format(Msg, [FSize, Position, FSize>Position]),
+    Name = list_to_atom(FileMd5),
+    Pid = whereis(Name),
+    {status, Status} = process_info(Pid,status),
+    % io:format("pid ~p, status ~p ~n", [Pid, Status]),
+
+    if
+        Status =:= waiting andalso FSize =/= Position ->
+            io:format("hibernate pid ~p, status ~p ~n", [Pid, Status]),
+            % 唤醒 hibernate 的进程
+            Item = sys:get_state(Name, infinity),
+            gen_server:cast(Pid, Item);
+        true ->
+            ok
+    end.
+
 %% 该函数功能是判断文件是否被重置 Nginx日志会被定期切割，被切割了之后，应该重新读取文件
 %% 修改日志内容多余400字符 应该被重置
 %% 重中间修改少于400字符的内容，为报异常
@@ -94,7 +131,8 @@ new_position(Fd, Position, FSize) ->
     end.
 
 scan_file(Item) ->
-    {FileMd5, _Position, File, Separator, Multiline, Keys, Index} = Item,
+    {FileMd5, File, Separator, Multiline, Keys, Index} = Item,
+
     case file:open(File, read) of
         {ok, Fd} ->
             % 从数据库读取
@@ -116,21 +154,17 @@ scan_file(Item) ->
             case Res of
                 {eof, Position2} ->
                     esc_db:save_logfile(FileMd5, Position2),
-                    % 休眠5s
-                    timer:sleep(5000),
-                    % eof 的情况下，再次循环文件
-                    Item2 = {FileMd5, Position2, File, Separator, Multiline, Keys, Index},
-                    scan_file(Item2);
+                    hibernate;
                 _ ->
-                    io:format("scan_file end Res ~p ~n", [Res])
-            end,
-            {ok, Res};
+                    io:format("scan_file end Res ~p ~n", [Res]),
+                {ok, Res}
+            end;
         {error, enoent} -> % enoent 表示文件不存在了，文件被重命名的时候会这样
-            % 休眠11s
-            timer:sleep(11000),
-            % 需要重头开始读取文件
+            % 下次需要重头开始读取文件
             esc_db:save_logfile(FileMd5, 0),
-            scan_file(Item);
+            % 休眠5s
+            timer:sleep(5000),
+            {error, enoent};
         {error, Why} ->
             io:format("file:open/2 error: ~p ~n", [Why]),
             {error, Why}
@@ -150,7 +184,10 @@ loop_read_file_line(Fd, Separator, Keys, Index, File) ->
             loop_read_file_line(Fd, Separator, Keys, Index, File);
         {ok, Line2} ->
             RowId = esc_func:md5(Line2),
-            io:format("Position ~p RowId ~p ~n", [Position, RowId]),
+            % io:format("Position ~p RowId ~p ~n", [Position, RowId]),
+
+            % {status, Status} = process_info(self(),status),
+            % io:format("loop_read_file_line/5 pid ~p, status ~p ~n", [self(), Status]),
             % io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
             MsgData = str_to_json(Line2, Separator, Keys, File),
@@ -365,12 +402,13 @@ format_k_v_split(Key, Val) ->
 sent_to_msg(Index, MsgMd5, Msg) ->
     Index2 = filter_index_name(Index),
     try
+        io:format("try sent_to_msg/3 index: ~p, md5: ~p ~n", [Index2, MsgMd5]),
         % io:format("try sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg])
         % ok
         erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"doc">>, MsgMd5, Msg)
     catch
         Exception:Reason ->
-            io:format("sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index2, MsgMd5, Msg]),
+            io:format("catch sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index2, MsgMd5, Msg]),
             io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
             {caught, Exception, Reason}
     end.
