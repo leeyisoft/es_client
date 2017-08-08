@@ -91,37 +91,15 @@ filelib:fold_files(Dir, "."++BaseName, true, fun(F, AccIn) -> [F | AccIn] end, [
 ```
 
 ### 引入 mnesia
+
+* 先 application:stop(mnesia)
+* mnesia检查数据库是否创建
+* 确保先创建 schema 之后再启动 mnesia
+* 确保已经 mnesia:start().
+
 ```
-mnesia:system_info(use_dir)
 
-% mnesia检查数据库是否创建
-% 确保先创建 schema 之后再启动 mnesia
-% 确保已经 mnesia:start().
-lists:member(esc_logfile, mnesia:system_info(tables)).
-
-mnesia:create_table(esc_logfile, [{attributes, record_info(fields, esc_logfile)}]).
-
-rr("/Users/leeyi/workspace/erl/es_client/apps/es_client/include/es_client.hrl").
-
-%% 查询 使用 qlc
-
-mnesia:transaction(fun() ->
-    Q = qlc:q([E || E <- mnesia:table(esc_logfile)]),
-    qlc:e(Q)
-end).
-
-%% 部分查询 使用 qlc
-
-mnesia:transaction(fun() ->
-    Q = qlc:q([[E#esc_logfile.name_md5, E#esc_logfile.last_position] || E <- mnesia:table(esc_logfile)]),
-    qlc:e(Q)
-end).
-
-
-filelib:file_size("/Users/leeyi/workspace/tools/nginx/logs/task_log.log").
 esc_db:get_last_position("07cac3d69147445787f7493af965bdd9").
-
-mnesia:dirty_read(esc_logfile, "07cac3d69147445787f7493af965bdd9")
 
 
 observer:stop(), observer:start().
@@ -274,7 +252,7 @@ cover:analyse_to_file(func).
 ./rebar3 eunit
 ```
 
-### 发布
+### [发布](https://my.oschina.net/leeyisoft/blog/1504354)
 
 ```
 rebar3 as product release
@@ -300,10 +278,4 @@ bin/es_client start
 
 {include_erts, false} ，开发时使用这个配置，在执行 rebar3 release 时，只是创建一个ERTS的软链接，省下了拷贝文件的时间。在生产环境下，你可以创建一个product的profile，里面定义 {include_erts, true} ，这样执行 rebar3 as product release 时，ERTS会被拷贝到发布文件夹中，在服务器上部署不需要安装Erlang。
 
-首先目标主机需要安装 erlang/otp 我这里安装
-
-首先在centos7上面源码安装erlang/otp 20
-之后把安装好的打包，下载到本地
-
-https://www.rebar3.org/v3.0/docs/publishing-packages
-https://github.com/erlang/rebar3/issues/954
+详细发布流程请参考 https://my.oschina.net/leeyisoft/blog/1504354
