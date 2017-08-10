@@ -1,4 +1,4 @@
--sname es_client
+-name es_client
 
 -mnesia dir '"mnesia.db"'
 

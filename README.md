@@ -279,3 +279,17 @@ bin/es_client start
 {include_erts, false} ，开发时使用这个配置，在执行 rebar3 release 时，只是创建一个ERTS的软链接，省下了拷贝文件的时间。在生产环境下，你可以创建一个product的profile，里面定义 {include_erts, true} ，这样执行 rebar3 as product release 时，ERTS会被拷贝到发布文件夹中，在服务器上部署不需要安装Erlang。
 
 详细发布流程请参考 https://my.oschina.net/leeyisoft/blog/1504354
+
+### 远程监控
+
+首先把需要监控的环境的 config/vm.args 配置做如下修改：
+```
+-name es_client@192.168.2.207
+```
+192.168.2.207 为目标环境的IP；
+
+修改完成、重启节点后，在本地运行：
+```
+erl -name debug@192.168.2.128 -setcookie es_client_cookie -remsh es_client@192.168.2.207
+```
+就进入了目标环境，直接 `ctrl+c` 再输入`a` 退出；货主 `q().` 退出

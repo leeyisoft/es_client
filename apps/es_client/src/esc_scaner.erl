@@ -130,9 +130,7 @@ new_position(Fd, Position, FSize) ->
             0
     end.
 
-scan_file(Item) ->
-    {FileMd5, File, Separator, Multiline, Keys, Index} = Item,
-
+scan_file({FileMd5, File, Separator, Multiline, Keys, Index} = Item) ->
     case file:open(File, read) of
         {ok, Fd} ->
             % 从数据库读取
