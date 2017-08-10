@@ -54,12 +54,12 @@ handle_call(_Request, _From, State) ->
 
 
 handle_cast({check_list, List}, State) when length(List)>0 ->
-    % io:format("check_list pid ~p, State ~p~n", [self(), State]),
+    io:format("check_list pid ~p, list ~p, State ~p~n", [self(), List, State]),
     check_scaner(List),
     {noreply, State};
 handle_cast(Msg, State) ->
     Pid = self(),
-    % io:format("我是子拥程~p Msg ~p ~n", [Pid, Msg]),
+    io:format("handle_cast pid ~p, Msg ~p ~n", [Pid, Msg]),
     % io:format("我是子拥程~p State ~p ~n", [Pid, State]),
 
     Res = scan_file(Msg),
@@ -67,6 +67,8 @@ handle_cast(Msg, State) ->
     {noreply, State, Res}.
 
 handle_info(_Info, State) ->
+    Pid = self(),
+    io:format("我是子拥程~p handle_info/2 _Info ~p, State ~p ~n", [Pid, _Info, State]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -82,29 +84,24 @@ code_change(_OldVsn, State, _Extra) ->
 
 check_scaner(List) when is_list(List) ->
     % io:format("check_scaner/1 list pid ~p , List ~p~n", [self(), List]),
+
     [check_scaner(Item) || Item <- List],
     % 休眠5s
     timer:sleep(5000),
     check_scaner(List);
 
-check_scaner({FileMd5, File}) ->
-    % 从数据库读取
-    Position = esc_db:get_last_position(FileMd5),
-    % 获取文件大小
-    FSize = filelib:file_size(File),
-    % Msg = "check_scaner/1 tuple , FSize ~p , Position ~p , FSize>Position : ~p ~n",
-    % io:format(Msg, [FSize, Position, FSize>Position]),
+check_scaner({FileMd5}) ->
     Name = list_to_atom(FileMd5),
     Pid = whereis(Name),
     {status, Status} = process_info(Pid,status),
     % io:format("pid ~p, status ~p ~n", [Pid, Status]),
-
     if
-        Status =:= waiting andalso FSize =/= Position ->
-            io:format("hibernate pid ~p, status ~p ~n", [Pid, Status]),
+        Status =:= waiting ->
+            % io:format("Status =:= waiting pid ~p, status ~p ~n", [Pid, Status]),
             % 唤醒 hibernate 的进程
             Item = sys:get_state(Name, infinity),
             gen_server:cast(Pid, Item);
+            % gen_server:cast(Pid, Item);
         true ->
             ok
     end.
@@ -130,7 +127,7 @@ new_position(Fd, Position, FSize) ->
             0
     end.
 
-scan_file({FileMd5, File, Separator, Multiline, Keys, Index} = Item) ->
+scan_file({FileMd5, File, Separator, Multiline, Keys, Index}) ->
     case file:open(File, read) of
         {ok, Fd} ->
             % 从数据库读取
@@ -399,14 +396,15 @@ format_k_v_split(Key, Val) ->
 
 sent_to_msg(Index, MsgMd5, Msg) ->
     Index2 = filter_index_name(Index),
+    Pid = self(),
     try
-        io:format("try sent_to_msg/3 index: ~p, md5: ~p ~n", [Index2, MsgMd5]),
-        % io:format("try sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index, MsgMd5, Msg])
+        io:format("try Pid ~p sent_to_msg/3 index: ~p, md5: ~p ~n", [Pid, Index2, MsgMd5]),
+        % io:format("try Pid ~p sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Pid, Index, MsgMd5, Msg])
         % ok
         erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"doc">>, MsgMd5, Msg)
     catch
         Exception:Reason ->
-            io:format("catch sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Index2, MsgMd5, Msg]),
+            io:format("catch Pid ~p sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Pid, Index2, MsgMd5, Msg]),
             io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
             {caught, Exception, Reason}
     end.

@@ -39,6 +39,9 @@ observer:start().
 application:start(es_client).
 
 
+Res =  [{"07cac3d69147445787f7493af965bdd9"}, {"828b0bf200000d82f793c4b246a0bcc9"}].
+gen_server:cast(<0.148.0>, {check_list, Res}).
+
 esc_db:get_last_position("2a68be7fed46cc80ed9794c77a0041fa").
 filelib:file_size("/Users/leeyi/workspace/tools/wwwlogs/admin.dev.afd56.com.cn.access.log").
 
@@ -269,7 +272,7 @@ mv es_client-0.1.0.tar.gz /usr/local/es_client/
 
 cd /usr/local/es_client
 
-tar -xvf es_client-0.1.0.tar.gz
+tar -xzf es_client-0.1.0.tar.gz
 
 bin/es_client console
 

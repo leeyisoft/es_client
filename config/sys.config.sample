@@ -36,7 +36,7 @@
                     {name, "message", string}
                 ],
                 multiline=>false,
-                index=>"filebeat-esc-test-afd-task-{Y-m-d}",
+                index=>"filebeat-esc-test-afd-task-{Ymd}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/task_log.log"
             },
             #{ % for nginx error
@@ -60,7 +60,7 @@
                     ]}
                 ],
                 multiline=>"\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}",
-                index=>"filebeat-esc-test-nginx-error-{Y-m-d}",
+                index=>"filebeat-esc-test-nginx-error-{Ymd}",
                 file=>"/Users/leeyi/workspace/tools/nginx/logs/*error.log"
             }
         ]}

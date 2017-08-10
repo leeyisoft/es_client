@@ -64,7 +64,7 @@ start_scaner() ->
             StartArgs = {FileMd5, File, Separator, Multiline, Keys, Index},
             Res2 = supervisor:start_child(es_client_sup, [StartArgs]),
             io:format("supervisor:start_child/2 : ~p~n", [Res2]),
-            {FileMd5, File}
+            {FileMd5}
         end
     ),
     supervisor:start_child(es_client_sup, [{esc_check_scaner, {check_list, Res}}]),
