@@ -39,10 +39,17 @@ observer:start().
 application:start(es_client).
 
 
-Res =  [{"07cac3d69147445787f7493af965bdd9"}, {"828b0bf200000d82f793c4b246a0bcc9"}].
-gen_server:cast(<0.148.0>, {check_list, Res}).
+esc_db:save_logfile(b94615e871c908619231418a0d27e4df, 3).
+esc_db:get_last_position('4e6b4fb3b23db71c4a51124d9de155a1').
 
-esc_db:get_last_position("2a68be7fed46cc80ed9794c77a0041fa").
+rd(esc_logfile ,{ name_md5, last_position}).
+Data = #esc_logfile{
+    name_md5='90a1b746a382dc494c3a960b5d3bdba5',
+    last_position=3
+},
+mnesia:dirty_write(Data).
+mnesia:dirty_read({esc_logfile, '90a1b746a382dc494c3a960b5d3bdba5'}).
+
 filelib:file_size("/Users/leeyi/workspace/tools/wwwlogs/admin.dev.afd56.com.cn.access.log").
 
 InitArgs={"2a68be7fed46cc80ed9794c77a0041fa",0,

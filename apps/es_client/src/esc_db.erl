@@ -61,11 +61,9 @@ get_last_position(NameMd5) ->
 
 
 save_logfile(FileMd5, Position) when is_integer(Position), Position >=0 ->
-    mnesia:transaction(fun() ->
-        Data = #?LogFileTable{
-            name_md5=FileMd5,
-            last_position=Position
-        },
-        mnesia:write(Data)
-    end).
+    Data = #?LogFileTable{
+        name_md5=FileMd5,
+        last_position=Position
+    },
+    mnesia:dirty_write(Data).
 
