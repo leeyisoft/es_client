@@ -17,6 +17,8 @@
     %
     { es_client, [
 
+        {log_path, ""},
+
         % 生产环境用 disc_copies ， 开发环境用 ram_copies
         {table_copies, disc_copies},
 

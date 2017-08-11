@@ -19,7 +19,7 @@
 ]).
 
 % for test
--compile(export_all).
+% -compile(export_all).
 
 
 %%====================================================================
@@ -29,10 +29,9 @@
 start_link({Name, StartArgs}) ->
     gen_server:start_link({local, Name}, ?MODULE, StartArgs, []);
 
-start_link(StartArgs) ->
-    io:format("我是~p的子拥程 参数 ~p~n", [self(), StartArgs]),
-    {FileMd5, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs,
-    gen_server:start_link({local, list_to_atom(FileMd5)}, ?MODULE, StartArgs, []).
+start_link({FileMd5, _File, _Separator, _Multiline, _Keys, _Index} = StartArgs) ->
+    io:format("我是esc sup: ~p 参数 ~p~n", [self(), StartArgs]),
+    gen_server:start_link({local, FileMd5}, ?MODULE, StartArgs, []).
 
 init(InitArgs) ->
     % 注意，如果想让 terminate/2 在应用程序停止时被调用，
@@ -40,13 +39,13 @@ init(InitArgs) ->
     % process_flag(trap_exit, true),
 
     Pid = self(),
-    io:format("我是子拥程~p init InitArgs ~p ~n", [Pid, InitArgs]),
+    io:format("esc_scaner ~p init InitArgs ~p ~n", [Pid, InitArgs]),
 
     gen_server:cast(Pid, InitArgs),
     {ok, InitArgs}.
 
 handle_call(stop, _From, _State) ->
-    io:format("我是~p的子拥程 handle_call stop _From ~p State~p~n", [self(), _From, _State]),
+    % io:format("我是 scaner ~p handle_call stop _From ~p State~p~n", [self(), _From, _State]),
     {stop, normal, _State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -54,21 +53,22 @@ handle_call(_Request, _From, State) ->
 
 
 handle_cast({check_list, List}, State) when length(List)>0 ->
-    io:format("check_list pid ~p, list ~p, State ~p~n", [self(), List, State]),
+    % io:format("check_list pid ~p, list ~p, State ~p~n", [self(), List, State]),
     check_scaner(List),
     {noreply, State};
-handle_cast(Msg, State) ->
-    Pid = self(),
-    io:format("handle_cast pid ~p, Msg ~p ~n", [Pid, Msg]),
+handle_cast(Msg, State) when is_tuple(Msg) ->
+    % Pid = self(),
+    % io:format("handle_cast pid ~p, Msg ~p ~n", [Pid, Msg]),
     % io:format("我是子拥程~p State ~p ~n", [Pid, State]),
-
     Res = scan_file(Msg),
-    io:format("我是子拥程~p scan_file Res ~p ~n", [Pid, Res]),
-    {noreply, State, Res}.
+    % io:format("我是子拥程~p scan_file Res ~p ~n", [Pid, Res]),
+    {noreply, State, Res};
+handle_cast(_Msg, State) ->
+    {noreply, State}.
 
 handle_info(_Info, State) ->
     Pid = self(),
-    io:format("我是子拥程~p handle_info/2 _Info ~p, State ~p ~n", [Pid, _Info, State]),
+    io:format("我是scaner ~p handle_info/2 _Info ~p, State ~p ~n", [Pid, _Info, State]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -84,14 +84,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 check_scaner(List) when is_list(List) ->
     % io:format("check_scaner/1 list pid ~p , List ~p~n", [self(), List]),
-
-    [check_scaner(Item) || Item <- List],
+    [check_scaner(FileMd5) || FileMd5 <- List],
     % 休眠5s
     timer:sleep(5000),
     check_scaner(List);
 
-check_scaner({FileMd5}) ->
-    Name = list_to_atom(FileMd5),
+check_scaner(Name) when is_atom(Name) ->
     Pid = whereis(Name),
     {status, Status} = process_info(Pid,status),
     % io:format("pid ~p, status ~p ~n", [Pid, Status]),
@@ -101,7 +99,6 @@ check_scaner({FileMd5}) ->
             % 唤醒 hibernate 的进程
             Item = sys:get_state(Name, infinity),
             gen_server:cast(Pid, Item);
-            % gen_server:cast(Pid, Item);
         true ->
             ok
     end.
@@ -302,7 +299,7 @@ filter_k_v(Item) ->
             [filter_k_v(Item2) || Item2 <- lists:flatten(Item)];
         _ ->
             % 应该要把 Item 打印到日志文件里面，看看是什么东西
-            io:format("format_k_v/1 Item ~p~n", [Item]),
+            esc_loger:log("format_k_v/1 Item ~p~n", [Item]),
             Item
     end.
 
@@ -398,14 +395,11 @@ sent_to_msg(Index, MsgMd5, Msg) ->
     Index2 = filter_index_name(Index),
     Pid = self(),
     try
-        io:format("try Pid ~p sent_to_msg/3 index: ~p, md5: ~p ~n", [Pid, Index2, MsgMd5]),
-        % io:format("try Pid ~p sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Pid, Index, MsgMd5, Msg])
-        % ok
-        erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"doc">>, MsgMd5, Msg)
+        erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg)
     catch
         Exception:Reason ->
-            io:format("catch Pid ~p sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Pid, Index2, MsgMd5, Msg]),
-            io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
+            esc_loger:log("catch Pid ~p sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Pid, Index2, MsgMd5, Msg]),
+            esc_loger:log("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
             {caught, Exception, Reason}
     end.
 
@@ -423,13 +417,13 @@ filter_index_name(Index, List) when length(List)==1 ->
     {{Year, Month, Day}, _} = calendar:local_time(),
     Ymd = case Item of
         "{Y-m}" ->
-            lists:flatten( io_lib:format("~4..0w-~2..0w", [Year, Month]));
+            lists:flatten(io_lib:format("~4..0w-~2..0w", [Year, Month]));
         "{Y-m-d}" ->
-            lists:flatten( io_lib:format("~4..0w-~2..0w-~2..0w", [Year, Month, Day]));
+            lists:flatten(io_lib:format("~4..0w-~2..0w-~2..0w", [Year, Month, Day]));
         "{Ym}" ->
-            lists:flatten( io_lib:format("~4..0w~2..0w", [Year, Month]));
+            lists:flatten(io_lib:format("~4..0w~2..0w", [Year, Month]));
         "{Ymd}" ->
-            lists:flatten( io_lib:format("~4..0w~2..0w~2..0w", [Year, Month, Day]));
+            lists:flatten(io_lib:format("~4..0w~2..0w~2..0w", [Year, Month, Day]));
         _ ->
             Item
     end,

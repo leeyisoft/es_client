@@ -57,14 +57,11 @@ start_scaner() ->
         % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
         fun(File, Separator, Multiline, Keys, Index) ->
             % io:format("es_client start_scaner : ~p~n", [[File, Multiline, Separator]]),
-            FileMd5 = esc_func:md5(File),
-            % io:format("FileMd5 : ~p~n", [FileMd5]),
-
+            FileMd5 = list_to_atom(esc_func:md5(File)),
             % start_child
             StartArgs = {FileMd5, File, Separator, Multiline, Keys, Index},
-            Res2 = supervisor:start_child(es_client_sup, [StartArgs]),
-            io:format("supervisor:start_child/2 : ~p~n", [Res2]),
-            {FileMd5}
+            supervisor:start_child(es_client_sup, [StartArgs]),
+            FileMd5
         end
     ),
     supervisor:start_child(es_client_sup, [{esc_check_scaner, {check_list, Res}}]),
