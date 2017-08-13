@@ -20,19 +20,19 @@ start(_StartType, _StartArgs) ->
     io:format("es_client start _StartType ~p ~n", [_StartType]),
     io:format("es_client start _StartArgs ~p ~n", [_StartArgs]),
     % 启动依赖APP
-    application:start(sasl),
-    application:start(crypto),
-    application:start(asn1),
-    application:start(public_key),
-    application:start(ssl),
-    application:start(unicode_util_compat),
-    application:start(idna),
-    application:start(mimerl),
-    application:start(certifi),
-    application:start(ssl_verify_fun),
-    application:start(metrics),
-    application:start(hackney),
-    application:start(erlastic_search),
+    % application:start(sasl),
+    % application:start(crypto),
+    % application:start(asn1),
+    % application:start(public_key),
+    % application:start(ssl),
+    % application:start(unicode_util_compat),
+    % application:start(idna),
+    % application:start(mimerl),
+    % application:start(certifi),
+    % application:start(ssl_verify_fun),
+    % application:start(metrics),
+    % application:start(hackney),
+    % application:start(erlastic_search),
 
     esc_db:start(),
 
@@ -50,7 +50,7 @@ stop(_State) ->
     ok.
 
 start_scaner() ->
-    Res = start_scaner(
+    List = start_scaner(
         % Separator 为 "" 的标示为json格式数据
         % Multiline 为 false 的表示单行匹配; 为 list 正则表达式
         fun(File, Separator, Multiline, Keys, Index) ->
@@ -58,12 +58,11 @@ start_scaner() ->
             FileMd5 = list_to_atom(esc_func:md5(File)),
             % start_child
             StartArgs = {FileMd5, File, Separator, Multiline, Keys, Index},
-            supervisor:start_child(es_client_sup, [StartArgs]),
+            supervisor:start_child(esc_scaner_sup, [StartArgs]),
             FileMd5
         end
     ),
-    supervisor:start_child(es_client_sup, [{esc_check_scaner, {check_list, Res}}]),
-    % io:format("start_scaner/0 : ~p~n", [Res]),
+    whereis(esc_scaner_checker) ! {check_scaner, List},
     ok.
 
 

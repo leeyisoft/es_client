@@ -39,7 +39,7 @@ init(InitArgs) ->
     % process_flag(trap_exit, true),
 
     Pid = self(),
-    io:format("esc_scaner ~p init InitArgs ~p ~n", [Pid, InitArgs]),
+    % io:format("esc_scaner ~p init InitArgs ~p ~n", [Pid, InitArgs]),
 
     gen_server:cast(Pid, InitArgs),
     {ok, InitArgs}.
@@ -51,13 +51,8 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-
-handle_cast({check_list, List}, State) when length(List)>0 ->
-    % io:format("check_list pid ~p, list ~p, State ~p~n", [self(), List, State]),
-    check_scaner(List),
-    {noreply, State};
 handle_cast(Msg, State) when is_tuple(Msg) ->
-    Pid = self(),
+    % Pid = self(),
     % io:format("handle_cast pid ~p, Msg ~p ~n", [Pid, Msg]),
     % io:format("我是子拥程~p State ~p ~n", [Pid, State]),
     Res = scan_file(Msg),
@@ -82,29 +77,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %%====================================================================
 
-check_scaner(List) when is_list(List) ->
-    % io:format("check_scaner/1 list pid ~p, Num ~p , List ~p~n", [self(), Num, List]),
-    [check_scaner(FileMd5) || FileMd5 <- List],
-
-    % 休眠3s
-    timer:sleep(3000),
-    check_scaner(List);
-
-check_scaner(Name) when is_atom(Name) ->
-    Pid = whereis(Name),
-    {status, Status} = process_info(Pid,status),
-    % io:format("pid ~p, status ~p ~n", [Pid, Status]),
-    if
-        Status =:= waiting ->
-            % io:format("Status =:= waiting pid ~p, status ~p ~n", [Pid, Status]),
-            % 唤醒 hibernate 的进程
-            Item = sys:get_state(Name, infinity),
-            gen_server:cast(Pid, Item);
-        true ->
-            ok
-    end.
-
-
 %% 该函数功能是判断文件是否被重置 Nginx日志会被定期切割，被切割了之后，应该重新读取文件
 %% 修改日志内容多余400字符 应该被重置
 %% 重中间修改少于400字符的内容，为报异常
@@ -116,7 +88,7 @@ new_position(Fd, Position, FSize) ->
             % 把文件指针移到上次读取后的位置
             file:position(Fd, {bof, Position}),
             Position;
-        (Position - FSize) =< 400  ->
+        (Position - FSize) =< 40  ->
             % 把文件指针移到文件末尾
             file:position(Fd, {eof, 0}),
             FSize;
@@ -400,11 +372,11 @@ sent_to_msg(Index, MsgMd5, Msg, File) ->
             false ->
                 Msg
         end,
-        % io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
-            % [Pid, Index2, MsgMd5, Msg2])
+        io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
+            [Pid, Index2, MsgMd5, Msg2])
         % io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
         %     [Pid, Index2, MsgMd5, Msg2]),
-        erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg2)
+        % erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg2)
     catch
         Exception:Reason ->
             esc_loger:log("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
