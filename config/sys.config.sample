@@ -33,7 +33,7 @@
             #{
                 separator=>"|",
                 keys=>[
-                    {name, "createtime", datetime},
+                    {name, "@timestamp", datetime},
                     {name, "level", string},
                     {name, "message", string}
                 ],
@@ -45,7 +45,7 @@
                 separator=>", cl",
                 keys=>[
                     {split,"[\\[|\\]]+", [
-                        {name, "createtime", datetime},
+                        {name, "@timestamp", datetime},
                         {name, "level", string},
                         {name, "message", string}
                     ]},

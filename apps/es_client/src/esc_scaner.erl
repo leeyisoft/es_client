@@ -19,7 +19,7 @@
 ]).
 
 % for test
-% -compile(export_all).
+-compile(export_all).
 
 
 %%====================================================================
@@ -57,7 +57,7 @@ handle_cast({check_list, List}, State) when length(List)>0 ->
     check_scaner(List),
     {noreply, State};
 handle_cast(Msg, State) when is_tuple(Msg) ->
-    % Pid = self(),
+    Pid = self(),
     % io:format("handle_cast pid ~p, Msg ~p ~n", [Pid, Msg]),
     % io:format("我是子拥程~p State ~p ~n", [Pid, State]),
     Res = scan_file(Msg),
@@ -83,10 +83,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%====================================================================
 
 check_scaner(List) when is_list(List) ->
-    % io:format("check_scaner/1 list pid ~p , List ~p~n", [self(), List]),
+    % io:format("check_scaner/1 list pid ~p, Num ~p , List ~p~n", [self(), Num, List]),
     [check_scaner(FileMd5) || FileMd5 <- List],
-    % 休眠5s
-    timer:sleep(5000),
+
+    % 休眠3s
+    timer:sleep(3000),
     check_scaner(List);
 
 check_scaner(Name) when is_atom(Name) ->
@@ -102,6 +103,7 @@ check_scaner(Name) when is_atom(Name) ->
         true ->
             ok
     end.
+
 
 %% 该函数功能是判断文件是否被重置 Nginx日志会被定期切割，被切割了之后，应该重新读取文件
 %% 修改日志内容多余400字符 应该被重置
@@ -133,7 +135,7 @@ scan_file({FileMd5, File, Separator, Multiline, Keys, Index}) ->
             FSize = filelib:file_size(File),
 
             NewPosition = new_position(Fd, Position, FSize),
-            % io:format("我是子拥程~p scan_file Position ~p ~n", [self(), Position]),
+            % io:format("Pid ~p scan_file Position ~p ~n", [self(), Position]),
 
             Res = if
                 Multiline==false -> % 循环读取文件行
@@ -154,9 +156,7 @@ scan_file({FileMd5, File, Separator, Multiline, Keys, Index}) ->
         {error, enoent} -> % enoent 表示文件不存在了，文件被重命名的时候会这样
             % 下次需要重头开始读取文件
             esc_db:save_logfile(FileMd5, 0),
-            % 休眠5s
-            timer:sleep(5000),
-            {error, enoent};
+            hibernate;
         {error, Why} ->
             io:format("file:open/2 error: ~p ~n", [Why]),
             {error, Why}
@@ -182,8 +182,8 @@ loop_read_file_line(Fd, Separator, Keys, Index, File) ->
             % io:format("loop_read_file_line/5 pid ~p, status ~p ~n", [self(), Status]),
             % io:format("Position ~p RowId ~p : ~p~n", [Position, RowId, Line2]),
 
-            MsgData = str_to_json(Line2, Separator, Keys, File),
-            sent_to_msg(Index, RowId, MsgData),
+            MsgData = str_to_json(Line2, Separator, Keys),
+            sent_to_msg(Index, RowId, MsgData, File),
 
             loop_read_file_line(Fd, Separator, Keys, Index, File);
         eof ->
@@ -230,9 +230,9 @@ loop_read_file_multiline(StartPoistion, ReadLength, Param) ->
                     % 计算每个记录的开始位置和长度, 根据每个记录的开始位置和长度读取记录
                     Rows = [esc_func:esc_read_line(Fd, StartPoistion + Start, Offset) || {Start,Offset} <- lists:zip(ListA, List5)],
                     % 把记录转换成 erlastic_json() 类型的数据
-                    DataList = [{esc_func:md5(Str), str_to_json(Str, Separator, Keys, File)} || Str <- Rows],
+                    DataList = [{esc_func:md5(Str), str_to_json(Str, Separator, Keys)} || Str <- Rows],
                     % 发送数据到 es
-                    [sent_to_msg(Index, RowId, MsgData) || {RowId, MsgData} <- DataList],
+                    [sent_to_msg(Index, RowId, MsgData, File) || {RowId, MsgData} <- DataList],
 
                     % 从新的位置继续读取
                     NewStartPoistion = lists:max(List2) + StartPoistion,
@@ -241,10 +241,10 @@ loop_read_file_multiline(StartPoistion, ReadLength, Param) ->
                     % io:format("~n not end StartPoistion ~p, 1 ReadLength ~p ~n", [StartPoistion, ReadLength]),
                     loop_read_file_multiline(StartPoistion, ReadLength * 3, Param);
                 {match, _} -> % 最后一行了
-                    MsgData = str_to_json(Binary, Separator, Keys, File),
+                    MsgData = str_to_json(Binary, Separator, Keys),
                     % save to mnesia
                     RowId = esc_func:md5(Binary),
-                    sent_to_msg(Index, RowId, MsgData),
+                    sent_to_msg(Index, RowId, MsgData, File),
                     % msg_sender:sent_to_es(Index, RowId, MsgData),
 
                     Len = length(Binary),
@@ -262,7 +262,7 @@ loop_read_file_multiline(StartPoistion, ReadLength, Param) ->
     end.
 
 %%
-str_to_json(Str, Separator, Keys, File) ->
+str_to_json(Str, Separator, Keys) ->
     try
 
         if
@@ -270,24 +270,23 @@ str_to_json(Str, Separator, Keys, File) ->
                 jsx:decode(list_to_binary(Str));
             true ->
                 Vals = esc_func:esc_split(Str, Separator, all),
-                kv_to_erlastic_json(Keys, Vals, File)
+                kv_to_erlastic_json(Keys, Vals)
         end
     catch
         Exception:Reason ->
-            io:format("~n catch str_to_json Separator: ~p, Keys: ~p, string: ~p~n~n~n", [Separator, Keys, Str]),
+            io:format("~n catch str_to_json Separator: ~p, Key, ~p, string: ~p~n", [Separator, Keys, Str]),
             io:format("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
             % 可以把这里的错误也发送到 es 里面去
             {caught, Exception, Reason}
     end.
 
-kv_to_erlastic_json(Keys, Vals, File) when is_list(Keys), is_list(Vals), length(Keys)>0, length(Vals)>0 ->
+kv_to_erlastic_json(Keys, Vals) when is_list(Keys), is_list(Vals), length(Keys)>0, length(Vals)>0 ->
     KVList = esc_func:esc_zip(Keys, Vals),
     % io:format("kv_to_erlastic_json Vals: ~p~n", [Vals]),
     % io:format("kv_to_erlastic_json KVList: ~p~n", [KVList]),
     Items = lists:flatten([format_k_v(Key, Val) || {Key, Val} <- KVList]),
-    Items2 = [{"file", File} | Items],
     % io:format("kv_to_erlastic_json Items: ~p~n", [Items]),
-    [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- [filter_k_v(Item) || Item <- Items2]].
+    [{list_to_binary(X),list_to_binary(Y)} || {X,Y} <- [filter_k_v(Item) || Item <- Items]].
 
 %% 过滤无效字符串 "\" :\n\\"
 filter_k_v(Item) ->
@@ -391,15 +390,25 @@ format_k_v_split(Key, Val) ->
     end.
 
 
-sent_to_msg(Index, MsgMd5, Msg) ->
+sent_to_msg(Index, MsgMd5, Msg, File) ->
     Index2 = filter_index_name(Index),
     Pid = self(),
     try
-        erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg)
+        Msg2 = case lists:keytake(<<"@timestamp">>, 1, Msg) of
+            {value, {Key, Timestamp}, List} ->
+                [{list_to_binary("file"), list_to_binary(File)}, {Key, list_to_binary(esc_func:timestamp_format(Timestamp))} | List];
+            false ->
+                Msg
+        end,
+        % io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
+            % [Pid, Index2, MsgMd5, Msg2])
+        io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
+            [Pid, Index2, MsgMd5, Msg2]),
+        erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg2)
     catch
         Exception:Reason ->
-            esc_loger:log("catch Pid ~p sent_to_msg/3 index: ~p, md5: ~p , msg: ~p~n", [Pid, Index2, MsgMd5, Msg]),
             esc_loger:log("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),
+            esc_loger:log("catch Pid ~p sent_to_msg/4 index: ~p, md5: ~p , msg: ~p~n", [Pid, Index2, MsgMd5, Msg]),
             {caught, Exception, Reason}
     end.
 

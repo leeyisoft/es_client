@@ -10,8 +10,6 @@
 %% Application callbacks
 -export([start/2
     , stop/1
-
-    , start_scaner/0
 ]).
 
 %%====================================================================
