@@ -402,8 +402,8 @@ sent_to_msg(Index, MsgMd5, Msg, File) ->
         end,
         % io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
             % [Pid, Index2, MsgMd5, Msg2])
-        io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
-            [Pid, Index2, MsgMd5, Msg2]),
+        % io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
+        %     [Pid, Index2, MsgMd5, Msg2]),
         erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg2)
     catch
         Exception:Reason ->
