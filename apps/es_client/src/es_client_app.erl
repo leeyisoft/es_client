@@ -134,7 +134,8 @@ analysis_files_item(Item, Callback) ->
                     % 解析文件列表
                     Dir = filename:dirname(File),
                     BaseName = filename:basename(File),
-                    FileList = filelib:fold_files(Dir, "."++BaseName, true, fun(F, AccIn) -> [F | AccIn] end, []),
+                    BaseName2 = lists:flatten(string:replace(BaseName, "*", ".*")),
+                    FileList = filelib:fold_files(Dir, BaseName2, true, fun(F, AccIn) -> [F | AccIn] end, []),
                     % io:format("FileList ~p~n", [FileList]),
                     [Callback(File2, Separator, Multiline, Keys, Index) || File2 <- FileList ];
                 true ->
