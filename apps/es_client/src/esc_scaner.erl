@@ -361,7 +361,6 @@ format_k_v_split(Key, Val) ->
             {KeyName, Val2}
     end.
 
-
 sent_to_msg(Index, MsgMd5, Msg, File) ->
     Index2 = filter_index_name(Index),
     Pid = self(),
@@ -372,11 +371,9 @@ sent_to_msg(Index, MsgMd5, Msg, File) ->
             false ->
                 Msg
         end,
-        io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
-            [Pid, Index2, MsgMd5, Msg2])
         % io:format("try Pid ~p sent_to_msg/4 index: ~p, md5: ~p, Msg2: ~p ~n",
-        %     [Pid, Index2, MsgMd5, Msg2]),
-        % erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg2)
+            % [Pid, Index2, MsgMd5, Msg2])
+        erlastic_search:index_doc_with_id(list_to_binary(Index2), <<"log">>, MsgMd5, Msg2)
     catch
         Exception:Reason ->
             esc_loger:log("Exception: ~p , Reason: ~p, ~n", [Exception, Reason]),

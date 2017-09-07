@@ -263,7 +263,12 @@ cover:analyse_to_file(func).
 ```
 
 ### [发布](https://my.oschina.net/leeyisoft/blog/1504354)
+发布之前要设置 src/es_client.app.src :
+```
+{applications, [kernel,stdlib,jsx,erlastic_search,mnesia,iso8601]},
+```
 
+发布命令
 ```
 rebar3 as product release
 
@@ -284,6 +289,8 @@ tar -xzf es_client-0.1.0.tar.gz
 bin/es_client console
 
 bin/es_client start
+
+http://192.168.2.212:9100/_cat/indices?v
 ```
 
 {include_erts, false} ，开发时使用这个配置，在执行 rebar3 release 时，只是创建一个ERTS的软链接，省下了拷贝文件的时间。在生产环境下，你可以创建一个product的profile，里面定义 {include_erts, true} ，这样执行 rebar3 as product release 时，ERTS会被拷贝到发布文件夹中，在服务器上部署不需要安装Erlang。

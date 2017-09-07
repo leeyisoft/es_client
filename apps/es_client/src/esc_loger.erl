@@ -61,11 +61,11 @@ log(Msg, List, Level) ->
                 [_H|_T] ->
                     lists:flatten(io_lib:format(Msg, List))
         end,
-        Msg3 = lists:flatten(io_lib:format("~ts~n", [Msg2])),
+        Msg3 = lists:flatten(io_lib:format("~t~n", [Msg2])),
         file:write(Fd, list_to_binary(Msg3))
     catch
         Exception:Reason ->
             % 本来就是在异常的情况下记录错误日志，这里再错了，就没有办法了
             % Msg 里面包含中文，会报异常
-            io:format("esc_loger:log/3 Exception: ~p , Reason: ~p, Msg ~ts ~n", [Exception, Reason, Msg])
+            io:format("esc_loger:log/3 Exception: ~p , Reason: ~p, Msg ~t ~n", [Exception, Reason, Msg])
     end.
