@@ -23,10 +23,9 @@ Erlang/OTP 20 [erts-9.0] [source] [64-bit] [smp:4:4] [ds:4:4:10] [async-threads:
 % 启动
 erl -boot start_sasl -pa _build/default/lib/*/ebin -config config/sys.config
 
-./rebar3 clean && ./rebar3 compile && erl  -boot start_sasl +A 2 \
+./rebar3 clean && ./rebar3 compile && erl  -boot start_sasl +A 2 +S 2 \
     -pa _build/default/lib/*/ebin -config config/sys.config \
     -sname es_client -mnesia dir '"mnesia.db"'
-
 
 ./rebar3 clean && ./rebar3 compile && erl \
     -pa _build/default/lib/*/ebin -config config/sys.config \
